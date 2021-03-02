@@ -19,7 +19,7 @@ search_stanzas_randomized_test() ->
     random:seed(now()),
     N = 100000,
     {Time, NStanzas} = timer:tc(?MODULE,  process_stanzas, [N, <<>>, 0, <<>>, 0]),
-    ?debugFmt("~p stanzas parsed for ~p microseconds", [NStanzas, Time]),
+    ?debugFmt("~tp stanzas parsed for ~tp microseconds", [NStanzas, Time]),
     ?assertEqual(N, NStanzas).
 
 process_stanzas(0, _, 0, <<>>, ParsedStanzas) -> ParsedStanzas;
@@ -27,7 +27,7 @@ process_stanzas(N, MessageStream, Length, ParserState, ParsedStanzas) when N /= 
     Stanza = random_stanza(),
     process_stanzas(N-1, <<MessageStream/binary, Stanza/binary>>, Length + byte_size(Stanza), ParserState, ParsedStanzas);
 process_stanzas(N, MessageStream, 0, ParserState, ParsedStanzas) ->
-    ?debugFmt("something wrong ~p ~p ~p ~p", [N, MessageStream, ParserState, ParsedStanzas]);
+    ?debugFmt("something wrong ~tp ~tp ~tp ~tp", [N, MessageStream, ParserState, ParsedStanzas]);
 process_stanzas(N, MessageStream, Length, ParserState, ParsedStanzas) ->
     PartLength = random:uniform(Length),
     Part = binary:part(MessageStream, 0, PartLength),

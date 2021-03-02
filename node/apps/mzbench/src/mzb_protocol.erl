@@ -72,6 +72,6 @@ handle({user_metric_value, _Ref = Callback, {Metric, Value}}, _) ->
     noreply;
 
 handle(Unhandled, _) ->
-    system_log:error("Unhandled node message: ~p", [Unhandled]),
+    logger:error("Unhandled node message: ~tp", [Unhandled]),
     erlang:error({unknown_message, Unhandled}).
 

@@ -19,7 +19,7 @@ connect(Host, Port) ->
     case gen_tcp:connect(Host, Port, [{active, false}, {reuseaddr, true}, binary]) of
         {ok, Socket} -> Socket;
         {error, Reason} ->
-            lager:error("Tcp connect failed with reason ~p: ~p", [Reason, inet:format_error(Reason)]),
+            lager:error("Tcp connect failed with reason ~tp: ~tp", [Reason, inet:format_error(Reason)]),
             erlang:error({tcp_connect_failed, Reason})
     end.
 
@@ -156,13 +156,13 @@ get_xml_message({presence}) ->
 
 % wrappers to make them loggable
 send(Socket, Data) ->
-    % lager:info("[send] ~p", [Data]),
+    % lager:info("[send] ~tp", [Data]),
     gen_tcp:send(Socket, Data).
 
 recv(Socket, Buffer, Timeout) ->
     case gen_tcp:recv(Socket, Buffer, Timeout) of
         {ok, Data} ->
-            % lager:info("[recv] ~p", [Data]),
+            % lager:info("[recv] ~tp", [Data]),
             Data;
         {error, closed} ->
             mzb_metrics:notify({"xmpp.connection-closed", counter}, 1),

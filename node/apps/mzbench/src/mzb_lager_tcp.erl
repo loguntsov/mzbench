@@ -24,7 +24,7 @@
 -define(INTERVAL, 100). % in ms
 
 init([Level, Sock, MessageQLenLimit, RateLimit, ErrorMetric]) ->
-    system_log:info("Started tcp lager backend for ~p ~p", [Level, Sock]),
+    logger:info("Started tcp lager backend for ~tp ~tp", [Level, Sock]),
     erlang:process_flag(trap_exit, true),
     Formatter = lager_default_formatter,
     FormatterConfig = ?TERSE_FORMAT,
@@ -65,7 +65,7 @@ handle_event({log, Message},
 
     case (MaxQ /= undefined) andalso (N rem 10 == 0) andalso erlang:process_info(self(), message_queue_len) of
         {_, Len} when Len > MaxQ ->
-            send_direct_warning("Dropped ~b log messages (mailbox overflow) on ~p", [Len div 2, node()], State),
+            send_direct_warning("Dropped ~b log messages (mailbox overflow) on ~tp", [Len div 2, node()], State),
             mzb_metrics:notify({"logs.dropped.mailbox_overflow", counter}, Len div 2),
             {ok, State#state{skip_messages = Len div 2, n = N + 1}};
         _ ->
@@ -90,7 +90,7 @@ handle_info(activate, State = #state{n = N, dropped = Dropped}) ->
     case Dropped > 0 of
         true ->
             mzb_metrics:notify({"logs.dropped.rate_limiter", counter}, Dropped),
-            send_direct_warning("Dropped ~b log messages (rate limiter) on ~p", [Dropped, node()], State);
+            send_direct_warning("Dropped ~b log messages (rate limiter) on ~tp", [Dropped, node()], State);
         false ->
             ok
     end,
@@ -114,7 +114,7 @@ handle_info(_Info, State) ->
     {ok, State}.
 
 terminate(Reason, #state{socket = S} = _State) ->
-    system_log:info("Terminated tcp lager backend for ~p with reason ~p", [S, Reason]),
+    logger:info("Terminated tcp lager backend for ~tp with reason ~tp", [S, Reason]),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->

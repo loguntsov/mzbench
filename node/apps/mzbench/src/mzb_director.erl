@@ -70,13 +70,13 @@ is_alive() ->
 %%%===================================================================
 
 init([SuperPid, BenchName, Script, Nodes, Env, Continuation]) ->
-    system_log:info("[ director ] Bench name ~p, director node ~p", [BenchName, erlang:node()]),
+    logger:info("[ director ] Bench name ~tp, director node ~tp", [BenchName, erlang:node()]),
     _ = mzb_lists:pmap(fun(Node) ->
         ok = mzb_interconnect:call(Node, {mzb_watchdog, activate})
     end, lists:usort(Nodes)),
     try mzbl_script:extract_info(Script, Env) of
         {Pools, Env2, Asserts} ->
-            system_log:info("[ director ] Pools: ~p, Env: ~p, Asserts: ~p", [Pools, Env2, Asserts]),
+            logger:info("[ director ] Pools: ~tp, Env: ~tp, Asserts: ~tp", [Pools, Env2, Asserts]),
 
             {_, []} = mzb_interconnect:multi_call(Nodes, {set_signaler_nodes, Nodes}),
             gen_server:cast(self(), start_pools),
@@ -105,7 +105,7 @@ init([SuperPid, BenchName, Script, Nodes, Env, Continuation]) ->
     end.
 
 handle_call({change_env, NewEnv}, _From, #state{script = Script, env = Env, nodes = Nodes} = State) ->
-    system_log:info("Changing env: ~p", [NewEnv]),
+    logger:info("Changing env: ~tp", [NewEnv]),
     MergedEnv = lists:foldl(
         fun ({K, V}, Acc) ->
             lists:keystore(K, 1, Acc, {K, V})
@@ -114,20 +114,20 @@ handle_call({change_env, NewEnv}, _From, #state{script = Script, env = Env, node
         {[{_, {ok, _}}|_], []} = mzb_interconnect:multi_call(lists:usort([node()|Nodes]), {compile_env, Script, MergedEnv}),
         {reply, ok, State#state{env = MergedEnv}}
     catch
-        _:E ->
-            system_log:error("Change env failed with reason ~p~nEnv:~p~nStacktrace:~p", [E, MergedEnv, erlang:get_stacktrace()]),
+        _:E:ST ->
+            logger:error("Change env failed with reason ~tp~nEnv:~tp~nStacktrace:~tp", [E, MergedEnv, ST]),
             {reply, {error, {internal_error, E}}, State}
     end;
 
 handle_call({run_command, Pool, Percent, Command}, _From, #state{nodes = Nodes} = State) ->
-    system_log:info("Running a command: ~p on ~p of pool~p", [Command, Percent, Pool]),
+    logger:info("Running a command: ~tp on ~tp of pool~tp", [Command, Percent, Pool]),
     try
         {Replies, []} = mzb_interconnect:multi_call(lists:usort([node()|Nodes]), {run_command, Pool, Percent, Command}),
         true = lists:all(fun(X) -> X == ok end, lists:flatten([L || {_, L} <- Replies])),
         {reply, ok, State}
     catch
-        _:E ->
-            system_log:error("Command run failed with reason ~p~nCommand:~p~nStacktrace:~p", [E, Command, erlang:get_stacktrace()]),
+        _:E:ST ->
+            logger:error("Command run failed with reason ~tp~nCommand:~tp~nStacktrace:~tp", [E, Command, ST]),
             {reply, {error, {internal_error, E}}, State}
     end;
 
@@ -135,11 +135,11 @@ handle_call(attach, From, State) ->
     maybe_report_and_stop(State#state{owner = From});
 
 handle_call(Req, _From, State) ->
-    system_log:error("Unhandled call: ~p", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 handle_cast(start_pools, #state{nodes = []} = State) ->
-    system_log:error("[ director ] There are no alive nodes to start workers"),
+    logger:error("[ director ] There are no alive nodes to start workers"),
     {stop, empty_nodes, State};
 
 handle_cast(start_pools, #state{script = Script, env = Env, nodes = Nodes} = State) ->
@@ -172,11 +172,11 @@ handle_cast({notification, {import_resource_error, _, _, _} = Reason}, #state{} 
     maybe_stop(State#state{stop_reason = Reason});
 
 handle_cast(Req, State) ->
-    system_log:error("Unhandled cast: ~p", [Req]),
+    logger:error("Unhandled cast: ~tp", [Req]),
     {stop, {unhandled_cast, Req}, State}.
 
 handle_info({'DOWN', _Ref, _, Pid, Reason}, #state{pools = Pools} = State) ->
-    system_log:error("Received DOWN from pool ~p with reason ~p", [Pid, Reason]),
+    logger:error("Received DOWN from pool ~tp with reason ~tp", [Pid, Reason]),
     case Reason of
         normal ->
             NewPools = proplists:delete(Pid, Pools),
@@ -186,7 +186,7 @@ handle_info({'DOWN', _Ref, _, Pid, Reason}, #state{pools = Pools} = State) ->
     end;
 
 handle_info(Req, State) ->
-    system_log:error("Unhandled info: ~p", [Req]),
+    logger:error("Unhandled info: ~tp", [Req]),
     {noreply, State}.
 
 -spec handle_pool_report(Info :: [{K :: atom(), V :: term()}], #state{}) -> #state{}.
@@ -219,13 +219,12 @@ start_metrics(#state{script = Script, assertions = Asserts, env = Env, nodes = N
         mzb_metrics:declare_metrics(WorkerMetrics ++ SystemMetrics),
         ok
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
+        C:E:ST ->
             erlang:raise(C, {start_metrics_failed, E}, ST)
     end.
 
 start_pools([], _, _, Acc) ->
-    system_log:info("[ director ] Started all pools"),
+    logger:info("[ director ] Started all pools"),
     Acc;
 start_pools([Pool | Pools], Env, Nodes, Acc) ->
     #operation{args = [PoolOpts, _]} = Pool,
@@ -238,7 +237,7 @@ start_pools([Pool | Pools], Env, Nodes, Acc) ->
             mzb_interconnect:spawn_monitor(Node, Self,
                 {start_pool, Pool, Env, length(Nodes), Num})
         end, NumberedNodes),
-    system_log:info("Start pool monitors: ~p", [NewRef]),
+    logger:info("Start pool monitors: ~tp", [NewRef]),
     Results = [{Pid, Mon} || {_, Pid, _} = Mon <- NewRef],
     start_pools(Pools, Env, shift(Nodes, Size), Results ++ Acc).
 
@@ -253,24 +252,24 @@ shift(Nodes, Size) when length(Nodes) < Size -> shift(Nodes, Size rem length(Nod
 shift(Nodes, Size) when Size > 0 -> {F, T} = lists:split(Size, Nodes), T ++ F.
 
 maybe_stop(#state{stop_reason = Reason, succeed = Ok, failed = NOk, stopped = Stopped} = State) when Reason /= undefined ->
-    system_log:info("[ director ] Received stop signal with reason: ~p", [Reason]),
-    system_log:info("[ director ] Succeed/Failed workers = ~p/~p", [Ok, NOk]),
-    system_log:info("[ director ] Stopped workers = ~p", [Stopped]),
+    logger:info("[ director ] Received stop signal with reason: ~tp", [Reason]),
+    logger:info("[ director ] Succeed/Failed workers = ~tp/~tp", [Ok, NOk]),
+    logger:info("[ director ] Stopped workers = ~tp", [Stopped]),
     stop_pools(State#state.pools),
     maybe_report_and_stop(State#state{pools = []});
 
 maybe_stop(#state{pools = [], succeed = Ok, failed = NOk, stopped = Stopped} = State) ->
     ok = mzb_metrics:final_trigger(),
-    system_log:info("[ director ] All pools have finished, stopping mzb_director_sup ~p", [State#state.super_pid]),
-    system_log:info("[ director ] Succeed/Failed workers = ~p/~p", [Ok, NOk]),
-    system_log:info("[ director ] Stopped workers = ~p", [Stopped]),
+    logger:info("[ director ] All pools have finished, stopping mzb_director_sup ~tp", [State#state.super_pid]),
+    logger:info("[ director ] Succeed/Failed workers = ~tp/~tp", [Ok, NOk]),
+    logger:info("[ director ] Stopped workers = ~tp", [Stopped]),
     FailedAsserts = mzb_metrics:get_failed_asserts(),
     Reason =
         case FailedAsserts of
             [] -> normal;
             _ ->
                 AssertMessages = [Msg || {_, Msg} <- FailedAsserts],
-                system_log:error("[ director ] Failed assertions:~n~s", [string:join(AssertMessages, "\n")]),
+                logger:error("[ director ] Failed assertions:~n~ts", [string:join(AssertMessages, "\n")]),
                 {assertions_failed, FailedAsserts}
         end,
     maybe_report_and_stop(State#state{stop_reason = Reason});
@@ -282,15 +281,15 @@ maybe_report_and_stop(#state{stop_reason = undefined} = State) ->
     {noreply, State};
 maybe_report_and_stop(#state{stop_reason = server_connection_closed, continuation = Continuation} = State) ->
     Continuation(),
-    system_log:error("[ director ] Stop benchmark because server connection is down"),
+    logger:error("[ director ] Stop benchmark because server connection is down"),
     erlang:spawn(fun mzb_sup:stop_bench/0),
     {stop, normal, State};
 maybe_report_and_stop(#state{owner = undefined} = State) ->
-    system_log:info("[ director ] Waiting for someone to report results..."),
+    logger:info("[ director ] Waiting for someone to report results..."),
     {noreply, State};
 maybe_report_and_stop(#state{owner = Owner, continuation = Continuation} = State) ->
     Continuation(),
-    system_log:info("[ director ] Reporting benchmark results to ~p", [Owner]),
+    logger:info("[ director ] Reporting benchmark results to ~tp", [Owner]),
     Res = format_results(State),
     gen_server:reply(Owner, Res),
     erlang:spawn(fun mzb_sup:stop_bench/0),
@@ -311,20 +310,20 @@ format_results(#state{stop_reason = {assertions_failed, dynamic_deadlock}}) ->
     {error, {asserts_failed, 1}, Str, get_stats_data()};
 format_results(#state{stop_reason = {assertions_failed, FailedAsserts}}) ->
     AssertsStr = string:join([S||{_, S} <- FailedAsserts], "\n"),
-    Str = mzb_string:format("~b assertions failed~n~s",
+    Str = mzb_string:format("~b assertions failed~n~ts",
                         [length(FailedAsserts), AssertsStr]),
     {error, {asserts_failed, length(FailedAsserts)}, Str, get_stats_data()};
 format_results(#state{stop_reason = {start_metrics_failed, E}}) ->
-    Str = mzb_string:format("start metrics subsystem failed: ~p", [E]),
+    Str = mzb_string:format("start metrics subsystem failed: ~tp", [E]),
     {error, start_metrics_failed, Str, get_stats_data()};
 format_results(#state{stop_reason = {import_resource_error, File, Type, Error}}) ->
-    Str = mzb_string:format("File ~p import failed: ~p", [File, Error]),
+    Str = mzb_string:format("File ~tp import failed: ~tp", [File, Error]),
     {error, {import_resource_error, File, Type, Error}, Str, {[], []}};
 format_results(#state{stop_reason = {var_is_unbound, Var}}) ->
-    Str = mzb_string:format("Var '~s' is not defined", [Var]),
+    Str = mzb_string:format("Var '~ts' is not defined", [Var]),
     {error, {var_is_unbound, Var}, Str, {[], []}};
 format_results(#state{stop_reason = Reason}) ->
-    Str = mzb_string:format("~p", [Reason]),
+    Str = mzb_string:format("~tp", [Reason]),
     {error, Reason, Str, {[], []}}.
 
 
@@ -332,12 +331,12 @@ get_stats_data() ->
     try
         {mzb_metrics:get_metrics(), mzb_metrics:get_histogram_data()}
     catch
-        _:Error ->
-            system_log:error("Get stats data exception: ~p~n~p", [Error, erlang:get_stacktrace()]),
+        _:Error:ST ->
+            logger:error("Get stats data exception: ~tp~n~tp", [Error, ST]),
             erlang:error(Error)
     end.
 
 compile_and_load(Script, Env) ->
     {NewScript, ModulesToLoad} = mzb_compiler:compile(Script, Env),
-    [{module, _} = code:load_binary(Mod, mzb_string:format("~s.erl", [Mod]), Bin) || {Mod, Bin} <- ModulesToLoad],
+    [{module, _} = code:load_binary(Mod, mzb_string:format("~ts.erl", [Mod]), Bin) || {Mod, Bin} <- ModulesToLoad],
     {ok, NewScript}.

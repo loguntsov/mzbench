@@ -17,7 +17,7 @@ validate(Module) ->
         _InfoList -> []
     catch
         _:_ ->
-            [mzb_string:format("Couldn't get module info for ~p", [Module])]
+            [mzb_string:format("Couldn't get module info for ~tp", [Module])]
     end.
 
 add_pathsz(Module) ->
@@ -30,7 +30,7 @@ add_pathsz(Module) ->
 
     CodePaths = [File || WC <- CodeWildcards, File <- mzb_file:wildcard(WC)],
 
-    system_log:info("Add worker paths: ~p", [CodePaths]),
+    logger:info("Add worker paths: ~tp", [CodePaths]),
 
     code:add_pathsz([filename:absname(P) || P <- CodePaths]).
 
@@ -123,7 +123,7 @@ load_config([]) ->
 load_config([File|T]) ->
     case file:consult(mzb_file:expand_filename(File)) of
         {ok, [Config]} ->
-            system_log:info("Reading configuration from ~s", [File]),
+            logger:info("Reading configuration from ~ts", [File]),
             lists:foreach(fun({App, Env}) ->
                                   [application:set_env(App, Key, Val) || {Key, Val} <- Env]
                           end, Config),
@@ -131,5 +131,5 @@ load_config([File|T]) ->
         {error, enoent} ->
             load_config(T);
         {error, Reason} ->
-            system_log:error("Could not open file ~p, reason ~p", [File, Reason])
+            logger:error("Could not open file ~tp, reason ~tp", [File, Reason])
     end.

@@ -8,13 +8,13 @@
     -> ok.
 run_worker_script(Script, Env, Worker, PoolPid, PoolName) ->
     _ = random:seed(now()),
-    ok = mzb_metrics:notify(mzb_string:format("workers.~s.started", [PoolName]), 1),
+    ok = mzb_metrics:notify(mzb_string:format("workers.~ts.started", [PoolName]), 1),
     Res = eval_script(Script, Env, Worker),
     case Res of
         {ok, _} -> ok;
-        _ -> mzb_metrics:notify(mzb_string:format("workers.~s.failed", [PoolName]), 1)
+        _ -> mzb_metrics:notify(mzb_string:format("workers.~ts.failed", [PoolName]), 1)
     end,
-    mzb_metrics:notify(mzb_string:format("workers.~s.ended", [PoolName]), 1),
+    mzb_metrics:notify(mzb_string:format("workers.~ts.ended", [PoolName]), 1),
     PoolPid ! {worker_result, self(), Res},
     ok.
 
@@ -34,11 +34,9 @@ catch_eval(Script, State, Env, {Provider, _}) ->
         {Result, ResState} = mzbl_interpreter:eval(Script, State, Env, Provider),
         {{ok, Result}, ResState}
     catch
-        error:{mzbl_interpreter_runtime_error, {{Error, Reason}, ErrorState}} ->
-            ST = erlang:get_stacktrace(),
+        error:{mzbl_interpreter_runtime_error, {{Error, Reason}, ErrorState}}:ST ->
             {{exception, {Error, Reason, ST}}, ErrorState};
-        C:E ->
-            ST = erlang:get_stacktrace(),
+        C:E:ST ->
             {{exception, {C, E, ST}}, unknown}
     end.
 
@@ -46,7 +44,7 @@ catch_init({Provider, Worker}) ->
     try Provider:init(Worker) of
         InitialState -> {ok, InitialState}
     catch
-        C:E -> {exception, {C, E, erlang:get_stacktrace()}}
+        C:E:ST -> {exception, {C, E, ST}}
     end.
 
 catch_terminate({ok, Res}, {WorkerProvider, _}, WorkerState) ->
@@ -54,8 +52,8 @@ catch_terminate({ok, Res}, {WorkerProvider, _}, WorkerState) ->
         WorkerProvider:terminate(Res, WorkerState),
         {ok, Res}
     catch
-        Class:Error ->
-            {exception, node(), {Class, Error, erlang:get_stacktrace()}, WorkerState}
+        Class:Error:ST ->
+            {exception, node(), {Class, Error, ST}, WorkerState}
     end;
 catch_terminate({exception, Spec}, _, unknown) ->
     %% do not call terminate in this case because worker provider
@@ -66,8 +64,7 @@ catch_terminate({exception, Spec}, {WorkerProvider, _}, WorkerState) ->
         WorkerProvider:terminate(Spec, WorkerState),
         {exception, node(), Spec, WorkerState}
     catch
-        Class:Error ->
-            ST = erlang:get_stacktrace(),
+        Class:Error:ST ->
             {exception, node(), {Class, Error, ST}, unknown}
     end.
 

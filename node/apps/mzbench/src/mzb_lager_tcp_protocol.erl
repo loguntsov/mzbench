@@ -25,7 +25,7 @@ dispatch(close_req, #state{socket = Socket, transport = Transport} = State) ->
     {stop, normal, State};
 
 dispatch(Unhandled, State) ->
-    system_log:error("Unhandled tcp message: ~p", [Unhandled]),
+    logger:error("Unhandled tcp message: ~tp", [Unhandled]),
     {noreply, State}.
 
 init([State]) -> {ok, State}.
@@ -59,19 +59,19 @@ handle_info({tcp, Socket, Msg}, State = #state{socket = Socket}) ->
     dispatch(erlang:binary_to_term(Msg), State);
 
 handle_info({tcp_error, _, Reason}, State) ->
-    system_log:warning("~p was closed with reason: ~p", [?MODULE, Reason]),
+    logger:warning("~tp was closed with reason: ~tp", [?MODULE, Reason]),
     {stop, Reason, State};
 
 handle_info(Info, State) ->
-    system_log:error("~p has received unexpected info: ~p", [?MODULE, Info]),
+    logger:error("~tp has received unexpected info: ~tp", [?MODULE, Info]),
     {stop, normal, State}.
 
 handle_cast(Msg, State) ->
-    system_log:error("~p has received unexpected cast: ~p", [?MODULE, Msg]),
+    logger:error("~tp has received unexpected cast: ~tp", [?MODULE, Msg]),
     {noreply, State}.
 
 handle_call(Request, _From, State) ->
-    system_log:error("~p has received unexpected call: ~p", [?MODULE, Request]),
+    logger:error("~tp has received unexpected call: ~tp", [?MODULE, Request]),
     {reply, ignore, State}.
 
 terminate(_Reason, #state{socket = Socket}) ->

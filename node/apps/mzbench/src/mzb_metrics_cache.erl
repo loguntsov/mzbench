@@ -44,7 +44,7 @@ init([]) ->
     {ok, nostate}.
 
 handle_call(Req, _From, State) ->
-    system_log:error("Unhandled call: ~p", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 handle_cast({cache_metric, Name, Value}, State) ->
@@ -52,11 +52,11 @@ handle_cast({cache_metric, Name, Value}, State) ->
     {noreply, State};
 
 handle_cast(Msg, State) ->
-    system_log:error("Unhandled cast: ~p", [Msg]),
+    logger:error("Unhandled cast: ~tp", [Msg]),
     {stop, {unhandled_cast, Msg}, State}.
 
 handle_info(Info, State) ->
-    system_log:error("Unhandled info: ~p", [Info]),
+    logger:error("Unhandled info: ~tp", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

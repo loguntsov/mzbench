@@ -83,7 +83,7 @@ metric_names() ->
 %% gen_server callbacks
 
 init([IntervalMs]) ->
-    system_log:info("~p started on node ~p", [?MODULE, node()]),
+    logger:info("~tp started on node ~tp", [?MODULE, node()]),
     _ = spawn_link(fun () -> mailbox_len_reporter(IntervalMs) end),
     erlang:send_after(IntervalMs, self(), trigger),
     {ok, #state{
@@ -113,7 +113,7 @@ handle_info(trigger,
 
     case cpu_sup:avg1() of
         {error, LAFailedReason} ->
-            system_log:info("cpu_sup:avg1() failed with reason ~p", [LAFailedReason]);
+            logger:info("cpu_sup:avg1() failed with reason ~tp", [LAFailedReason]);
         La1 ->
             ok = mzb_metrics:notify({metric_name("la1"), gauge}, La1 / 256)
     end,
@@ -125,7 +125,7 @@ handle_info(trigger,
         {unix, linux} ->
             case cpu_sup:util() of
                 {error, UtilFailedReason} ->
-                    system_log:info("cpu_sup:util() failed with reason ~p", [UtilFailedReason]);
+                    logger:info("cpu_sup:util() failed with reason ~tp", [UtilFailedReason]);
                 CpuUtil ->
                     ok = mzb_metrics:notify({metric_name("cpu"), gauge}, CpuUtil)
             end;
@@ -167,7 +167,7 @@ handle_info(trigger,
 
         State#state{net_stat_state = NetStat}
     catch
-        C:E -> system_log:error("Exception while getting net stats: ~p~nStacktrace: ~p", [{C,E}, erlang:get_stacktrace()]),
+        C:E:ST -> logger:error("Exception while getting net stats: ~tp~nStacktrace: ~tp", [{C,E}, ST]),
         State
     end,
 
@@ -185,7 +185,7 @@ handle_info(trigger,
         error:not_connected -> ok
     end,
 
-    %system_log:info("System load at ~p: cpu ~p, la ~p, ram ~p", [node(), Cpu, La1, AllocatedMem / TotalMem]),
+    %logger:info("System load at ~tp: cpu ~tp, la ~tp, ram ~tp", [node(), Cpu, La1, AllocatedMem / TotalMem]),
     erlang:send_after(IntervalMs, self(), trigger),
     {noreply, NewState#state{last_trigger_timestamp = Now}};
 
@@ -234,7 +234,7 @@ network_usage() ->
         network_load_for_arch(os:type())
     catch
         _:E ->
-            system_log:error("Error parsing network info: ~p", [E]),
+            logger:error("Error parsing network info: ~tp", [E]),
             []
     end.
 

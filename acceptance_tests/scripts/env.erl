@@ -16,7 +16,7 @@
          [{time, {{var, "loop_time", 1}, sec}},
           {rate, {{var, "loop_rate", 1}, rps}},
           {iterator, "it"}],
-         [{print, {sprintf, "Iteration ~p", [{var, "it"}]}}]
+         [{print, {sprintf, "Iteration ~tp", [{var, "it"}]}}]
      }
   ]}
 ].

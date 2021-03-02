@@ -1,9 +1,11 @@
 -module(mzb_api_ws_handler).
 
+-behaviour(cowboy_websocket).
+
 -export([init/2,
          terminate/3,
-         websocket_handle/3,
-         websocket_info/3,
+         websocket_handle/2,
+         websocket_info/2,
          reauth/1,
          close/2]).
 
@@ -84,7 +86,7 @@
 }).
 
 init(Req, _Opts) ->
-    lager:info("New WS connection"),
+    logger:info("New WS connection"),
     Cookies = cowboy_req:parse_cookies(Req),
     Token = proplists:get_value(mzb_api_auth:cookie_name(), Cookies, undefined),
 
@@ -108,27 +110,31 @@ terminate(_Reason, _Req, #state{ref = Ref}) ->
     gen_event:delete_handler(mzb_api_firehose, {mzb_api_firehose, Ref}, [self()]),
     ok.
 
-websocket_handle({text, Msg}, Req, State) ->
+websocket_handle({text, Msg}, State) ->
+    %% logger:info("WS REQUEST: ~tp", [ Msg ]),
     case dispatch_request(jiffy:decode(Msg, [return_maps]), State) of
-        {reply, Reply, NewState} ->
-            JsonReply = jiffy:encode(mzb_string:str_to_bstr(Reply), [force_utf8]),
-            {reply, {text, JsonReply}, Req, NewState};
-        {ok, NewState} ->
-            {ok, Req, NewState}
+        {reply, Reply, NewState = #state{}} ->
+            logger:info("Reply ~p", [ Reply ]),
+            JsonReply = iolist_to_binary(jiffy:encode(mzb_string:str_to_bstr(Reply), [force_utf8])),
+            %% logger:info("WS RESPONSE: ~tp", [ JsonReply ]),
+            {reply, {text, JsonReply}, NewState};
+        {ok, NewState = #state{}} ->
+            %% logger:info("WS NO REPLY"),
+            {ok, NewState}
     end;
 
-websocket_handle(_Data, Req, State) ->
-    {ok, Req, State}.
+websocket_handle(_Data, State) ->
+    {ok, State}.
 
-websocket_info(Message, Req, State) ->
+websocket_info(Message, State) ->
     case dispatch_info(Message, State) of
         {reply, Reply, NewState} ->
-            JsonReply = jiffy:encode(mzb_string:str_to_bstr(Reply), [force_utf8]),
-            {reply, {text, JsonReply}, Req, NewState};
+            JsonReply = iolist_to_binary(jiffy:encode(mzb_string:str_to_bstr(Reply), [force_utf8])),
+            {reply, {text, JsonReply}, NewState};
         {ok, NewState} ->
-            {ok, Req, NewState};
+            {ok, NewState};
         {stop, NewState} ->
-            {stop, Req, NewState}
+            {stop, NewState}
     end.
 
 dispatch_info(reauth, State) ->
@@ -238,7 +244,7 @@ dispatch_info({'DOWN', MonRef, process, MonPid, Reason},
                 case Reason of
                     normal -> ok;
                     aborted -> ok;
-                    _ -> lager:error("~p stream with stream_id = ~p crashed with reason: ~p", [Kind, StreamId, Reason])
+                    _ -> logger:error("~tp stream with stream_id = ~tp crashed with reason: ~tp", [Kind, StreamId, Reason])
                 end,
                 StreamId;
             false -> false
@@ -247,7 +253,7 @@ dispatch_info({'DOWN', MonRef, process, MonPid, Reason},
     case CheckStream(Streams, "Metric") of
         false -> case CheckStream(LStreams, "Log") of
                     false ->
-                        lager:error("Can't find streamer by {~p,~p}", [MonPid, MonRef]),
+                        logger:error("Can't find streamer by {~tp,~tp}", [MonPid, MonRef]),
                         {ok, State};
                     StreamId -> {ok, State#state{log_streams = maps:remove(StreamId, LStreams)}}
                  end;
@@ -258,11 +264,11 @@ dispatch_info({'DOWN', _, process, _, _}, State) ->
     {ok, State};
 
 dispatch_info({close, Reason}, State) ->
-    lager:info("Closing ~p ws connection because of ~p", [self(), Reason]),
+    logger:info("Closing ~tp ws connection because of ~tp", [self(), Reason]),
     {stop, State};
 
 dispatch_info(Info, State) ->
-    lager:warning("~p has received unexpected info: ~p", [?MODULE, Info]),
+    logger:warning("~tp has received unexpected info: ~tp", [?MODULE, Info]),
     {ok, State}.
 
 dispatch_request(#{<<"cmd">> := <<"generate-token">>} = Cmd, #state{user_info = UserInfo} = State) ->
@@ -284,9 +290,9 @@ dispatch_request(#{<<"cmd">> := <<"create_dashboard">>, <<"data">> := Data}, Sta
     dets:insert(dashboards, {NewId, Data}),
     dets:sync(dashboards),
     Event = #{
-               type => "DASHBOARD_CREATED",
-               data => NewId
-             },
+      type => "DASHBOARD_CREATED",
+      data => NewId
+    },
     {reply, Event, State};
 
 dispatch_request(#{<<"cmd">> := <<"update_dashboard">>, <<"data">> := Data}, State = #state{}) ->
@@ -294,10 +300,10 @@ dispatch_request(#{<<"cmd">> := <<"update_dashboard">>, <<"data">> := Data}, Sta
     dets:insert(dashboards, {Id, maps:remove(<<"id">>, Data)}),
     dets:sync(dashboards),
     Event = #{
-               type => "NOTIFY",
-               message => "Dashboard has been saved",
-               severity => "success"
-             },
+      type => "NOTIFY",
+      message => "Dashboard has been saved",
+      severity => "success"
+    },
     {reply, Event, State};
 
 dispatch_request(#{<<"cmd">> := <<"get_dashboards">>} = Cmd, State = #state{}) ->
@@ -313,10 +319,10 @@ dispatch_request(#{<<"cmd">> := <<"get_dashboards">>} = Cmd, State = #state{}) -
     Pager = maps:from_list([T || T = {_K,V} <- KV, V /= undefined]),
 
     Event = #{
-               type => "DASHBOARDS",
-               data => TimelineItems,
-               pager => Pager
-             },
+      type => "DASHBOARDS",
+      data => TimelineItems,
+      pager => Pager
+    },
 
     TimelineIds = [Id || #{id:= Id} <- TimelineItems],
 
@@ -340,7 +346,7 @@ dispatch_request(#{<<"cmd">> := <<"unsubscribe_benchset">>} = Cmd, State = #stat
     end;
 
 dispatch_request(#{<<"cmd">> := <<"get_timeline">>} = Cmd, State = #state{}) ->
-    lager:info("Get timeline start"),
+    logger:info("Get timeline start"),
     Limit = mzb_bc:maps_get(<<"limit">>, Cmd, 10),
     MaxId = mzb_bc:maps_get(<<"max_id">>, Cmd, undefined),
     MinId = mzb_bc:maps_get(<<"min_id">>, Cmd, undefined),
@@ -365,7 +371,7 @@ dispatch_request(#{<<"cmd">> := <<"get_timeline">>} = Cmd, State = #state{}) ->
 
     TimelineIds = [Id || #{id:= Id} <- TimelineItems],
 
-    lager:info("Get timeline end"),
+    logger:info("Get timeline end"),
     {reply, Event, State#state{timeline_opts   = Cmd,
                                timeline_bounds = {NewMinId, NewMaxId},
                                timeline_items  = TimelineIds}};
@@ -473,7 +479,7 @@ dispatch_request(#{<<"cmd">> := <<"remove_tag">>} = Cmd, #state{user_info = User
     {ok, State};
 
 dispatch_request(Cmd, State) ->
-    lager:warning("~p has received unexpected info: ~p~n~p", [?MODULE, Cmd, State]),
+    logger:warning("~tp has received unexpected info: ~tp~n~tp", [?MODULE, Cmd, State]),
     {ok, State}.
 
 apply_update(Fun) ->
@@ -484,9 +490,9 @@ apply_update(Fun) ->
             Str =
                 case Exception of
                     {ReasonAtom, ReasonStr} when is_atom(ReasonAtom) -> ReasonStr;
-                    _ -> io_lib:format("~p", [Exception])
+                    _ -> mzb_string:format("~tp", [Exception])
                 end,
-            mzb_api_firehose:notify(danger, mzb_string:format("~s", [Str]))
+            mzb_api_firehose:notify(danger, mzb_string:format("~ts", [Str]))
     end.
 
 disk_status() ->
@@ -507,8 +513,8 @@ add_stream(StreamId, BenchId, MetricName, StreamParams, #state{metric_streams = 
         end_time = EndTime,
         stream_after_eof = StreamAfterEof
     } = StreamParams,
-    lager:debug("Starting streaming metric ~p of the benchmark #~p with stream_id = ~p, subsampling_interval = ~p,
-                    begin_time = ~p, end_time = ~p, time_window = ~p, stream_after_eof = ~p",
+    logger:debug("Starting streaming metric ~tp of the benchmark #~tp with stream_id = ~tp, subsampling_interval = ~tp,
+                    begin_time = ~tp, end_time = ~tp, time_window = ~tp, stream_after_eof = ~tp",
                     [MetricName, BenchId, StreamId, SubsamplingInterval, BeginTime, EndTime, TimeWindow, StreamAfterEof]),
     Self = self(),
 
@@ -519,13 +525,13 @@ add_stream(StreamId, BenchId, MetricName, StreamParams, #state{metric_streams = 
     State#state{metric_streams = maps:put(StreamId, Ref, Streams)}.
 
 add_log_stream(BenchId, StreamId, #state{log_streams = Streams} = State) ->
-    lager:debug("Starting streaming logs of the benchmark #~p, stream #~p", [BenchId, StreamId]),
+    logger:debug("Starting streaming logs of the benchmark #~tp, stream #~tp", [BenchId, StreamId]),
     Pid = self(),
     Ref = erlang:spawn_monitor(fun() -> stream_log(BenchId, StreamId, Pid) end),
     State#state{log_streams = maps:put(StreamId, Ref, Streams)}.
 
 remove_stream(StreamId, Streams) ->
-    lager:debug("Stoping stream with stream_id = ~p", [StreamId]),
+    logger:debug("Stoping stream with stream_id = ~tp", [StreamId]),
     case maps:find(StreamId, Streams) of
         {ok, Ref} ->
             kill_streamer(Ref),
@@ -657,7 +663,7 @@ get_finals(Pid, StreamId, BenchIds, MetricName, Kind, XEnv) ->
       lists:zip(lists:reverse(lists:seq(1, length(Sorted))),
           lists:map(fun ({_, B}) -> {B, B, B} end, Sorted));
       true -> aggregate(Sorted) end,
-    Values = lists:foldl(fun({X, {Min, Avg, Max}}, Acc) -> [io_lib:format("~p\t~p\t~p\t~p~n", [X, Avg, Min, Max]) |Acc] end, [], Aggregated),
+    Values = lists:foldl(fun({X, {Min, Avg, Max}}, Acc) -> [mzb_string:format("~tp\t~tp\t~tp\t~tp~n", [X, Avg, Min, Max]) |Acc] end, [], Aggregated),
     Pid ! {metric_value, StreamId, Values},
     Pid ! {metric_batch_end, StreamId}.
 
@@ -754,8 +760,8 @@ filter_dashboards(List, Query) ->
           {match, _} -> true;
                    _ -> false
         end end, List)
-    catch _:Error ->
-        lager:error("Failed to apply dashboard filter: ~p ~p~n Query: ~p -- List ~p", [Error, erlang:get_stacktrace(), Query, List]),
+    catch _:Error:ST ->
+        logger:error("Failed to apply dashboard filter: ~tp ~tp~n Query: ~tp -- List ~tp", [Error, ST, Query, List]),
         []
     end.
 
@@ -807,8 +813,8 @@ is_satisfy_fields(Query, BenchInfo) ->
                       ({exact, Field}) ->
                           Field == Query
                   end, SearchFields)
-    catch _:Error ->
-        lager:error("Failed to apply filter: ~p ~p~n Query: ~p -- BenchInfo ~p", [Error, erlang:get_stacktrace(), Query, BenchInfo]),
+    catch _:Error:ST ->
+        logger:error("Failed to apply filter: ~tp ~tp~n Query: ~tp -- BenchInfo ~tp", [Error, ST, Query, BenchInfo]),
         false
     end.
 
@@ -896,7 +902,7 @@ log_file_streamer(Filename, ChunkSize, Compression, Pid, StreamId,
                     Pid ! {MessageType, batch_end, StreamId},
                     {0, StreamedBytes, no_overflow};
                 {error, E} ->
-                    lager:error("Error while reading log file: ~p", [E]),
+                    logger:error("Error while reading log file: ~tp", [E]),
                     {0, StreamedBytes, no_overflow}
             end
     end.
@@ -941,7 +947,7 @@ stream_metric(Id, Metric, StreamParams, SendFun) ->
     try
         PollTimeout = application:get_env(mzbench_api, bench_poll_timeout, undefined),
         perform_streaming(Id, FileReader, SendFun, StreamParams#stream_parameters{metric_report_interval_sec = ReportIntervalMs div 1000}, PollTimeout),
-        lager:debug("Streamer for #~b ~s has finished", [Id, Metric])
+        logger:debug("Streamer for #~b ~ts has finished", [Id, Metric])
     after
         FileReader(close)
     end.
@@ -1057,14 +1063,14 @@ perform_subsampling(SubsamplingInterval, LastSentValueTimestamp, PreviousSumForM
 
             case LastRetainedTime of
                 undefined -> {ValueTimestamp, 0, 0, undefined, undefined, [
-                        io_lib:format("~p\t~p\t~p\t~p~n",
+                        mzb_string:format("~tp\t~tp\t~tp\t~tp~n",
                             [ValueTimestamp, Value, NewMinValue, NewMaxValue]) | Acc]};
                 Timestamp ->
                     Interval = ValueTimestamp - Timestamp,
                     case Interval < SubsamplingInterval of
                         true -> {LastRetainedTime, SumForMean + Value, NumValuesForMean + 1, NewMinValue, NewMaxValue, Acc};
                         false -> {ValueTimestamp, 0, 0, undefined, undefined,
-                                    [io_lib:format("~p\t~p\t~p\t~p~n",
+                                    [mzb_string:format("~tp\t~tp\t~tp\t~tp~n",
                                         [ValueTimestamp, (SumForMean + Value)/(NumValuesForMean + 1), NewMinValue, NewMaxValue]) | Acc]}
                     end
             end

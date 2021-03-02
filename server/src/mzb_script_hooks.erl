@@ -16,7 +16,7 @@ process_hooks(DirFun, HookKind, Body, Env, Config, Logger) ->
     NewEnv.
 
 run_hook(_DirFun, #operation{name=exec, args=[Target, Cmd]}, Env, Config, Logger) ->
-    Logger(info, "Run exec hook ~p", [Cmd]),
+    logger:info( "Run exec hook ~tp", [Cmd]),
 
     #{director_host:= DHost, worker_hosts:= WHosts, user_name:= UserName} = Config,
 
@@ -27,15 +27,15 @@ run_hook(_DirFun, #operation{name=exec, args=[Target, Cmd]}, Env, Config, Logger
 
     _ = mzb_subprocess:remote_cmd(UserName, Hosts, Cmd, [], Logger, [stderr_to_stdout]),
     Env;
-run_hook(DirFun, #operation{name=worker_call, args=[Method | WorkerType]}, Env, _, Logger) ->
-    Logger(info, "Run worker hook ~p:~p", [WorkerType, Method]),
+run_hook(DirFun, #operation{name=worker_call, args=[Method | WorkerType]}, Env, _, _Logger) ->
+    logger:info( "Run worker hook ~tp:~tp", [WorkerType, Method]),
 
     case DirFun({call_worker, WorkerType, Method, Env}) of
         {ok, NewEnv} -> NewEnv;
         % special case for languages without atom/keywork type
         {"ok", NewEnv} -> NewEnv;
         IncorrectReturn ->
-            Logger(info, "Incorrect return value from worker hook ~p:~p", [WorkerType, Method]),
+            logger:info( "Incorrect return value from worker hook ~tp:~tp", [WorkerType, Method]),
             erlang:error({incorrect_hook_return, WorkerType, Method, IncorrectReturn})
     end;
 

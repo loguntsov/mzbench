@@ -1,7 +1,7 @@
 [ % random element example
     {pool, [{size, 1},
             {worker_type, dummy_worker}],
-        [{print, {sprintf, "binary: ~p,list: ~p,number: ~p", [{random_binary, 3}, {random_list, 3}, {random_number, 33}]}}]}
+        [{print, {sprintf, "binary: ~tp,list: ~tp,number: ~tp", [{random_binary, 3}, {random_list, 3}, {random_number, 33}]}}]}
 ].
 % should produce something like this:
 % 18:19:41.058 [info] <0.177.0> [ director ] Started all pools

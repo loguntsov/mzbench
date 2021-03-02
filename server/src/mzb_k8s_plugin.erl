@@ -52,23 +52,22 @@ create_cluster(PluginOpts, NumNodes, ClusterConfig) when is_integer(NumNodes), N
         {ok, PodData1} = get_pods(Context, Namespace, ["-l bench=" ++ BenchName]),
         PodNames = get_pod_names(PodData1),
         wait_pods_start(NumNodes, ID, PodNames, ?MAX_POLL_COUNT),
-        lager:info("Pods are running ~p", [PodNames]),
+        logger:info("Pods are running ~tp", [PodNames]),
         % IP addresses were not known before
         {ok, PodData2} = get_pods(Context, Namespace, ["-l bench=" ++ BenchName]),
         IPs = get_pod_ips(PodData2),
         wait_pods_ssh(IPs, ?MAX_POLL_COUNT),
-        lager:info("Pods are ssh-ready ~p", [PodNames]),
+        logger:info("Pods are ssh-ready ~tp", [PodNames]),
         {ok, ID, UserName, IPs}
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
+        C:E:ST ->
             destroy_cluster(ID),
             erlang:raise(C,E,ST)
     end.
 
 destroy_cluster(ID) ->
     R = delete_rc(ID),
-    lager:info("Destroyed RC: ~p, result: ~p", [ID, R]),
+    logger:info("Destroyed RC: ~tp, result: ~tp", [ID, R]),
     {ok, _} = R,
     ok.
 
@@ -138,7 +137,7 @@ wait_pods_start(0, _, _, _) -> [];
 wait_pods_start(N, ID, [H | T], C) ->
     {Context, Namespace, _} = ID,
     {ok, Res} = get_pods(Context, Namespace, [H]),
-    lager:info("Waiting pods result: ~p", [Res]),
+    logger:info("Waiting pods result: ~tp", [Res]),
     case get_map_value(<<"status">>, <<"phase">>, Res) of
         "Running" -> 
             [H | wait_pods_start(N-1, ID, T, C - 1)];
@@ -150,7 +149,7 @@ wait_pods_start(N, ID, [H | T], C) ->
 wait_pods_ssh(_, C) when C < 0 -> erlang:error({ec2_error, cluster_ssh_start_timed_out});
 wait_pods_ssh([], _) -> ok;
 wait_pods_ssh([H | T], C) ->
-    lager:info("Checking port 22 on ~p", [H]),
+    logger:info("Checking port 22 on ~tp", [H]),
     case gen_tcp:connect(H, 22, [], ?POLL_INTERVAL) of
         {ok, Socket} -> gen_tcp:close(Socket), wait_pods_ssh(T, C - 1);
         _ -> timer:sleep(?POLL_INTERVAL), wait_pods_ssh([H | T], C - 1)

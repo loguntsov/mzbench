@@ -69,7 +69,7 @@ count_response(Prefix, {true, _}) ->
 count_response(Prefix, {{true, _}, _}) ->
     mzb_metrics:notify(Prefix ++ ".ok", 1);
 count_response(Prefix, E) ->
-    lager:error("Error: ~p", [E]),
+    lager:error("Error: ~tp", [E]),
     mzb_metrics:notify(Prefix ++ ".error", 1).
 
 add_metric_group(GroupName) ->

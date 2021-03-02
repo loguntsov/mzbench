@@ -212,7 +212,7 @@ check_op(ramp, [Profile, Rate1, Rate2], T, Env) ->
     all_([
         case Profile of
             linear -> true;
-            _ -> {false, mzb_string:format("~p is not a valid ramp profile", [Profile]), undefined}
+            _ -> {false, mzb_string:format("~tp is not a valid ramp profile", [Profile]), undefined}
         end,
         is(rate, T),
         check(Rate1, rate, Env),
@@ -247,7 +247,7 @@ check_loop_spec_element(#operation{name = poisson, args = [Flag]}, Env) ->
 check_loop_spec_element(#operation{name = while, args = [Op]}, Env) ->
     check(Op, boolean_operation, Env);
 check_loop_spec_element(X, _Env) ->
-    {false, mzb_string:format("Bad loop spec element ~p", [X]), undefined}.
+    {false, mzb_string:format("Bad loop spec element ~tp", [X]), undefined}.
 
 -spec or_(typecheck_result(), typecheck_result()) -> typecheck_result().
 or_({false, Reason1, Location1}, {false, Reason2, _}) -> {false, {neither, Reason1, Reason2}, Location1};
@@ -283,10 +283,10 @@ add_location(_, X) -> X.
 
 -spec format_error(term()) -> string().
 format_error({X, is_not, Y}) ->
-    mzb_string:format("~p is not ~p", [X, Y]);
+    mzb_string:format("~tp is not ~tp", [X, Y]);
 format_error({neither, Reason1, Reason2}) ->
-    mzb_string:format("~s and ~s", [format_error(Reason1), format_error(Reason2)]);
+    mzb_string:format("~ts and ~ts", [format_error(Reason1), format_error(Reason2)]);
 format_error(Str) when is_list(Str) ->
-    Str;
+    lists:flatten(unicode:characters_to_list(list_to_binary(lists:flatten(Str))));
 format_error(Term) ->
-    mzb_string:format("~p", [Term]).
+    mzb_string:format("~tp", [Term]).

@@ -7,8 +7,8 @@
 script_metrics(Pools, _WorkerNodes) ->
 
     WorkerStatusGraphs = lists:map(fun (P) ->
-        {graph, #{title => mzb_string:format("Worker status (~s)", [pool_name(P)]),
-                  metrics => [{mzb_string:format("workers.~s.~s", [pool_name(P), X]), counter} || X <- ["started", "ended", "failed"]]
+        {graph, #{title => mzb_string:format("Worker status (~ts)", [pool_name(P)]),
+                  metrics => [{mzb_string:format("workers.~ts.~ts", [pool_name(P), X]), counter} || X <- ["started", "ended", "failed"]]
                             }}
         end, Pools),
 
@@ -32,9 +32,8 @@ script_metrics(Pools, _WorkerNodes) ->
         PoolMetrics = pool_metrics(Pools),
         normalize(PoolMetrics ++ MZBenchInternal)
     catch
-        _:Error ->
-            ST = erlang:get_stacktrace(),
-            system_log:error("Metrics declaration error: ~s", [mzb_script_metrics:format_error(Error)]),
+        _:Error:ST ->
+            logger:error("Metrics declaration error: ~ts", [mzb_script_metrics:format_error(Error)]),
             erlang:raise(error, Error, ST)
     end.
 
@@ -205,17 +204,17 @@ build_metric_groups_json(Groups) ->
 is_str(S) ->
     io_lib:printable_list(S).
 
-format_error({metrics_not_list, Seq}) -> mzb_string:format("Metrics should be a list: ~p", [Seq]);
-format_error({invalid_group_format, G}) -> mzb_string:format("Invalid group format: ~p", [G]);
-format_error({graphs_not_list, Grpahs}) -> mzb_string:format("Graphs should be a list: ~p", [Grpahs]);
-format_error({invalid_graph_format, G}) -> mzb_string:format("Invalid graph format: ~p", [G]);
-format_error({invalid_group_name, Name}) -> mzb_string:format("Invalid group name: ~p", [Name]);
-format_error({invalid_graph_title, Title}) -> mzb_string:format("Invalid graph title: ~p", [Title]);
-format_error({invalid_graph_units, Units}) -> mzb_string:format("Invalid graph units: ~p", [Units]);
-format_error({invalid_metric_name, Name}) -> mzb_string:format("Invalid metric name: ~p", [Name]);
-format_error({invalid_resolver_function, FunctionName}) -> mzb_string:format("Invalid resolver function: ~p", [FunctionName]);
-format_error({missing_resolver_function, Name}) -> mzb_string:format("Missing resolver function for derived metric: ~p", [Name]);
-format_error({invalid_metric_type, Invalid}) -> mzb_string:format("Invalid metric type: ~p", [Invalid]);
-format_error({invalid_metric_format, UnknownFormat}) -> mzb_string:format("Invalid metric format: ~p", [UnknownFormat]);
-format_error({opts_not_map, Opts}) -> mzb_string:format("Metric options should be a map: ~p", [Opts]);
-format_error(E) -> mzb_string:format("~p", [E]).
+format_error({metrics_not_list, Seq}) -> mzb_string:format("Metrics should be a list: ~tp", [Seq]);
+format_error({invalid_group_format, G}) -> mzb_string:format("Invalid group format: ~tp", [G]);
+format_error({graphs_not_list, Grpahs}) -> mzb_string:format("Graphs should be a list: ~tp", [Grpahs]);
+format_error({invalid_graph_format, G}) -> mzb_string:format("Invalid graph format: ~tp", [G]);
+format_error({invalid_group_name, Name}) -> mzb_string:format("Invalid group name: ~tp", [Name]);
+format_error({invalid_graph_title, Title}) -> mzb_string:format("Invalid graph title: ~tp", [Title]);
+format_error({invalid_graph_units, Units}) -> mzb_string:format("Invalid graph units: ~tp", [Units]);
+format_error({invalid_metric_name, Name}) -> mzb_string:format("Invalid metric name: ~tp", [Name]);
+format_error({invalid_resolver_function, FunctionName}) -> mzb_string:format("Invalid resolver function: ~tp", [FunctionName]);
+format_error({missing_resolver_function, Name}) -> mzb_string:format("Missing resolver function for derived metric: ~tp", [Name]);
+format_error({invalid_metric_type, Invalid}) -> mzb_string:format("Invalid metric type: ~tp", [Invalid]);
+format_error({invalid_metric_format, UnknownFormat}) -> mzb_string:format("Invalid metric format: ~tp", [UnknownFormat]);
+format_error({opts_not_map, Opts}) -> mzb_string:format("Metric options should be a map: ~tp", [Opts]);
+format_error(E) -> mzb_string:format("~tp", [E]).

@@ -13,9 +13,9 @@ validate(Script) ->
     Errors = [format_signal_deadlock_error(SCC) || SCC <- SCCs] ++
              [format_standalone_error(V) || V <- Standalones],
     Edges = [digraph:edge(Graph, E) || E <- digraph:edges(Graph)],
-    system_log:info("signals graph: ~p", [Edges]),
-    system_log:info("signals graph sccs: ~p", [SCCs]),
-    system_log:info("standalone signals: ~p", [Standalones]),
+    logger:info("signals graph: ~tp", [Edges]),
+    logger:info("signals graph sccs: ~tp", [SCCs]),
+    logger:info("standalone signals: ~tp", [Standalones]),
     case Errors of
         [] -> ok;
         _  ->
@@ -80,14 +80,14 @@ standalone_vertices(G) ->
         end, digraph:vertices(G)).
 
 format_standalone_error({_, wait_signal, N}) ->
-    mzb_string:format("Nobody sets signal ~p", [N]);
+    mzb_string:format("Nobody sets signal ~tp", [N]);
 format_standalone_error({_, set_signal, N}) ->
-    mzb_string:format("Nobody waits for signal ~p", [N]).
+    mzb_string:format("Nobody waits for signal ~tp", [N]).
 
 format_signal_deadlock_error(Cycle) ->
     FormatedCycle = [format_vertex(V) || V <- Cycle],
-    mzb_string:format("Deadlock is posible: ~s", [string:join(FormatedCycle, " -> ")]).
+    mzb_string:format("Deadlock is posible: ~ts", [string:join(FormatedCycle, " -> ")]).
 
 format_vertex({Pool, Op, Arg}) ->
-    io_lib:format("~s:~s(~p)", [Pool, Op, Arg]).
+    io_lib:format("~ts:~ts(~tp)", [Pool, Op, Arg]).
 

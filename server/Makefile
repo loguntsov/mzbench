@@ -69,6 +69,7 @@ clean:
 	$(REBAR) clean
 	rm -rf _build
 	rm -rf .make
+	rm -rf log
 
 .PHONY: generate
 generate: $(RELEASE_BINARY) ~/.local/share/mzbench_api/server.crt

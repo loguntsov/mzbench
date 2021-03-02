@@ -12,14 +12,14 @@ main([NodeName, Cookie, ReleasePackage]) ->
     TargetNode = start_distribution(NodeName, Cookie),
     {ok, Vsn} = rpc:call(TargetNode, release_handler, unpack_release,
                          [ReleasePackage], ?TIMEOUT),
-    ?INFO("Unpacked Release ~p~n", [Vsn]),
+    ?INFO("Unpacked Release ~tp~n", [Vsn]),
     {ok, OtherVsn, Desc} = rpc:call(TargetNode, release_handler,
                                     check_install_release, [Vsn], ?TIMEOUT),
     {ok, OtherVsn, Desc} = rpc:call(TargetNode, release_handler,
                                     install_release, [Vsn], ?TIMEOUT),
-    ?INFO("Installed Release ~p~n", [Vsn]),
+    ?INFO("Installed Release ~tp~n", [Vsn]),
     ok = rpc:call(TargetNode, release_handler, make_permanent, [Vsn], ?TIMEOUT),
-    ?INFO("Made Release ~p Permanent~n", [Vsn]);
+    ?INFO("Made Release ~tp Permanent~n", [Vsn]);
 main(_) ->
     init:stop(1).
 
@@ -33,7 +33,7 @@ start_distribution(NodeName, Cookie) ->
         {true, pong} ->
             ok;
         {_, pang} ->
-            io:format("Node ~p not responding to pings.\n", [TargetNode]),
+            io:format("Node ~tp not responding to pings.\n", [TargetNode]),
             init:stop(1)
     end,
     TargetNode.

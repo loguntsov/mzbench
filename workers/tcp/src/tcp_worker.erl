@@ -70,7 +70,7 @@ sender(Socket, Host, Port) ->
                         sender(Socket2, Host, Port);
     close -> if Socket =/= undefined -> gen_tcp:close(Socket); true -> ok end,
              sender(undefined, Host, Port);
-    Message -> lager:error("Unexpected message ~p", [Message]), sender(Socket, Host, Port)
+    Message -> lager:error("Unexpected message ~tp", [Message]), sender(Socket, Host, Port)
   end.
 
 connect(Host, Port) ->
@@ -103,7 +103,7 @@ request_sync(#s{socket = Socket} = State, _Meta, Message) ->
   mzb_metrics:notify({"latency", histogram}, Latency div 1000),
   case E of
       ok -> mzb_metrics:notify({"request.ok", counter}, 1);
-      E -> lager:error("Request sync error: ~p", [E]),
+      E -> lager:error("Request sync error: ~tp", [E]),
            mzb_metrics:notify({"request.error", counter}, 1)
   end,
   {nil, State}.

@@ -45,7 +45,7 @@ connect(State, _Meta, Param) ->
 query(#s{prefix = Prefix, client = Client} = State, _Meta, Statement) ->
     case ?TIMED(Prefix ++ ".latency", cqerl:run_query(Client, Statement)) of
         {ok, _} -> mzb_metrics:notify(Prefix ++ ".ok", 1);
-        E -> lager:error("Error: ~p", [E]),
+        E -> lager:error("Error: ~tp", [E]),
              mzb_metrics:notify(Prefix ++ ".error", 1)
     end,
     {nil, State}.

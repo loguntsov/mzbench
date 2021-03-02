@@ -20,7 +20,7 @@ doubled_print_counter() ->
 print(State, _Meta, Text) ->
     Start = os:timestamp(),
     _ = mzb_metrics:notify("print", 1),
-    lager:info("Dummy print: ~p", [Text]),
+    lager:info("Dummy print: ~tp", [Text]),
     Finish = os:timestamp(),
     _ = mzb_metrics:notify({"dummy", histogram}, timer:now_diff(Finish, Start)),
     {nil, State}.
@@ -37,5 +37,5 @@ test_proplist(State, _Meta, Proplist) ->
 
 terminate_state(Res, State) ->
     %% need this log for tests
-    system_log:info("TERMINATE ~p ~p", [Res, State]),
+    logger:info("TERMINATE ~tp ~tp", [Res, State]),
     ok.

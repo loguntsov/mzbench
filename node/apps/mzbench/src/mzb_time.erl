@@ -61,12 +61,12 @@ init([]) ->
     {ok, #state{sync_interval_ms = TimeSyncIntervalMS}}.
 
 handle_call(Req, _From, State) ->
-    system_log:error("Unhandled call: ~p", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 -spec handle_cast(term(), #state{}) -> term().
 handle_cast(Msg, State) ->
-    system_log:error("Unhandled cast: ~p", [Msg]),
+    logger:error("Unhandled cast: ~tp", [Msg]),
     {stop, {unhandled_cast, Msg}, State}.
 
 -spec handle_info(timeout | term(), #state{}) -> term().
@@ -76,7 +76,7 @@ handle_info(sync, #state{sync_interval_ms = SyncIntervalMs} = State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
-    system_log:error("Unhandled info: ~p", [Info]),
+    logger:error("Unhandled info: ~tp", [Info]),
     {noreply, State}.
 
 -spec terminate(term(), #state{}) -> ok.

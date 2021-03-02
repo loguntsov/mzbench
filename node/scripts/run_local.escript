@@ -53,7 +53,7 @@ run_script(Script, Env) ->
                     {ok, R, _} -> R;
                     {error, _, R, _} -> R
                 end,
-            io:format("~s~n", [Res]);
+            io:format("~ts~n", [Res]);
         {error, Messages} ->
             terminate_node(1, string:join(Messages, "\n"))
     end.
@@ -80,11 +80,11 @@ validate(Script, Env) ->
 
 nodename_gen() ->
     {N1,N2,N3} = os:timestamp(),
-    Str = lists:flatten(io_lib:format("~p-~p~p", [N1,N2,N3])),
+    Str = lists:flatten(io_lib:format("~tp-~tp~tp", [N1,N2,N3])),
     erlang:list_to_atom(Str).
 
 usage() ->
-    io:format("Usage: ~s ScriptName [--validate] [--env name=value...]~n", [escript:script_name()]).
+    io:format("Usage: ~ts ScriptName [--validate] [--env name=value...]~n", [escript:script_name()]).
 
 setup_logger(Handlers) ->
     ok = application:load(lager),
@@ -100,7 +100,7 @@ setup_logger(Handlers) ->
 terminate_node(ExitCode, Message) ->
     application:stop(lager),
     case ExitCode == 0 of
-        true  -> io:format("~s~n", [Message]);
-        false -> io:format(standard_error, "~s~n", [Message])
+        true  -> io:format("~ts~n", [Message]);
+        false -> io:format(standard_error, "~ts~n", [Message])
     end,
     erlang:halt(ExitCode).

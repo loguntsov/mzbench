@@ -7,10 +7,10 @@
 -spec init(cowboy_req:req(), any()) -> {ok, cowboy_req:req(), term()}.
 init(Req, _Opts) ->
     try
-        lager:debug("REQUEST: ~p", [Req]),
+        logger:debug("REQUEST: ~tp", [Req]),
         Path = cowboy_req:path(Req),
         Method = cowboy_req:method(Req),
-        lager:info("[ ~s ] ~s", [Method, Path]),
+        logger:info("[ ~ts ] ~ts", [Method, Path]),
         UserInfo = authorize(Method, Path, Req),
         handle(Method, Path, UserInfo, Req)
     catch
@@ -40,10 +40,10 @@ init(Req, _Opts) ->
             Req2 = reply_error(403, <<"forbidden">>, Description, Req),
             {ok, Req2, #{}};
 
-        _:E ->
-            Description = io_lib:format("Server Internal Error: ~p~n~nReq: ~p~n~nStacktrace: ~p", [E, Req, erlang:get_stacktrace()]),
+        _:E:ST ->
+            Description = mzb_string:format("Server Internal Error: ~tp~n~nReq: ~tp~n~nStacktrace: ~tp", [E, Req, ST]),
             Req2 = reply_error(500, <<"internal_error">>, Description, Req),
-            lager:error(Description),
+            logger:error(Description),
             {ok, Req2, #{}}
     end.
 
@@ -68,7 +68,7 @@ handle(<<"GET">>, <<"/github_auth">>, _, Req) ->
                 cowboy_req:set_resp_cookie(mzb_api_auth:cookie_name(), Ref,
                     [{http_only, true}], Req);
             {error, Reason} ->
-                lager:error("Authentication error: ~p", [Reason]),
+                logger:error("Authentication error: ~tp", [Reason]),
                 Req
         end,
     % we have to return redirect in any case because user is being redirected from github to ./github_auth
@@ -87,7 +87,7 @@ handle(<<"POST">>, <<"/auth">>, _, Req) ->
 
     AuthList = maps:from_list(lists:map(
         fun ({AType, Opts}) ->
-            {list_to_binary(AType), maps:from_list([{K, list_to_binary(V)} || {K, V} <- Opts])}
+            {list_to_binary(AType), maps:from_list([{K, iolist_to_binary(V)} || {K, V} <- Opts])}
         end, mzb_api_auth:get_auth_methods())),
 
     case Type of
@@ -99,10 +99,10 @@ handle(<<"POST">>, <<"/auth">>, _, Req) ->
                     {ok, reply_json(200,
                         #{res => <<"ok">>,
                           user_info => #{
-                            login => list_to_binary(Login),
-                            login_type => list_to_binary(LoginType),
-                            name => list_to_binary(UserName),
-                            picture_url => list_to_binary(UserPic)
+                            login => iolist_to_binary(Login),
+                            login_type => iolist_to_binary(LoginType),
+                            name => iolist_to_binary(UserName),
+                            picture_url => iolist_to_binary(UserPic)
                           }}, Req), #{}};
                 {error, Reason} ->
 
@@ -117,7 +117,7 @@ handle(<<"POST">>, <<"/auth">>, _, Req) ->
             end;
 
         _ ->
-            {ok, Code, Req2} = cowboy_req:body(Req),
+            {ok, Code, Req2} = cowboy_req:read_body(Req),
 
             case mzb_api_auth:auth_connection(undefined, binary_to_list(Type), Code) of
                 {ok, Ref, UserInfo} ->
@@ -126,13 +126,13 @@ handle(<<"POST">>, <<"/auth">>, _, Req) ->
                     {ok, reply_json(200,
                             #{res => <<"ok">>,
                               user_info => #{
-                                login => list_to_binary(maps:get(login, UserInfo)),
-                                login_type => list_to_binary(binary_to_list(Type)),
-                                name => list_to_binary(maps:get(name, UserInfo)),
-                                picture_url => list_to_binary(maps:get(picture_url, UserInfo))
+                                login => iolist_to_binary(maps:get(login, UserInfo)),
+                                login_type => iolist_to_binary(binary_to_list(Type)),
+                                name => iolist_to_binary(maps:get(name, UserInfo)),
+                                picture_url => iolist_to_binary(maps:get(picture_url, UserInfo))
                              }}, Req3), #{}};
                 {error, Reason} ->
-                    lager:error("Authentication error: ~p", [Reason]),
+                    logger:error("Authentication error: ~tp", [Reason]),
                     erlang:error(forbidden)
             end
     end;
@@ -146,7 +146,7 @@ handle(<<"POST">>, <<"/sign-out">>, _, Req) ->
     {ok, reply_json(200, #{}, Req2), #{}};
 
 handle(<<"POST">>, <<"/typecheck">>, _, Req) ->
-    case cowboy_req:parse_header(<<"content-type">>, Req) of
+    Req1 = case cowboy_req:parse_header(<<"content-type">>, Req) of
         {<<"multipart">>, <<"form-data">>, _} ->
             {Files, _Req2} = multipart(Req, []),
             [{_ScriptName, ScriptBody}] = proplists:get_all_values(<<"bench">>, Files),
@@ -158,7 +158,8 @@ handle(<<"POST">>, <<"/typecheck">>, _, Req) ->
             end;
         _ ->
             erlang:error({badarg, "Missing script file"})
-    end;
+    end,
+    { ok, Req1, #{}};
 
 handle(<<"POST">>, <<"/start">>, UserInfo, Req) ->
     Params = parse_start_params(Req),
@@ -266,8 +267,8 @@ handle(<<"GET">>, <<"/email_report">>, _UserInfo, Req) ->
 
 handle(<<"GET">>, <<"/graphs">>, _UserInfo, Req) ->
     with_bench_id(Req, fun(Id) ->
-        Location = list_to_binary(mzb_string:format("/#/bench/~p/overview", [Id])),
-        Headers = [{<<"Location">>, Location}],
+        Location = iolist_to_binary(mzb_string:format("/#/bench/~tp/overview", [Id])),
+        Headers = #{<<"Location">> => Location},
         {ok, cowboy_req:reply(302, Headers, <<>>, Req), #{}}
     end);
 
@@ -279,7 +280,7 @@ handle(<<"GET">>, <<"/clusters_info">>, _UserInfo, Req) ->
             fun ({state, S}) -> {state, erlang:atom_to_binary(S, latin1)};
                 ({provider, P}) -> {provider, erlang:atom_to_binary(P, latin1)};
                 ({hosts, Hosts}) -> {hosts, [erlang:list_to_binary(H) || H <- Hosts]};
-                ({reason, Reason}) -> {reason, erlang:iolist_to_binary(io_lib:format("~p", [Reason]))};
+                ({reason, Reason}) -> {reason, erlang:iolist_to_binary(mzb_string:format("~tp", [Reason]))};
                 ({K, V}) -> {K, V}
             end, D)
         end,
@@ -364,8 +365,8 @@ handle(<<"GET">>, <<"/remove_tags">>, _UserInfo, Req) ->
     end);
 
 handle(Method, Path, UserInfo, Req) ->
-    lager:error("Unknown request from ~p: ~p ~p~n~p", [maps:get(login, UserInfo), Method, Path, Req]),
-    erlang:error({not_found, io_lib:format("Wrong endpoint: ~p ~p", [Method, Path])}).
+    logger:error("Unknown request from ~tp: ~tp ~tp~n~tp", [maps:get(login, UserInfo), Method, Path, Req]),
+    erlang:error({not_found, mzb_string:format("Wrong endpoint: ~tp ~tp", [Method, Path])}).
 
 with_bench_id(Req, Action) ->
     Id2 =
@@ -385,7 +386,7 @@ with_bench_id(Req, Action) ->
 info({log, Msg}, Req, State) ->
     % this code is executed when you write something to log
     % so please don't log inside the function
-    ok = cowboy_req:chunk([Msg], Req),
+    ok = cowboy_req:stream_body(Msg, nofin, Req),
     {ok, Req, State}.
 
 terminate(_Reason, _Req, #{lager_backend_id:= Id}) ->
@@ -394,10 +395,10 @@ terminate(_Reason, _Req, _State) ->
     ok.
 
 multipart(Req, Res) ->
-    case cowboy_req:part(Req) of
+    case cowboy_req:read_part(Req) of
         {ok, Headers, Req2} ->
             {ok, Body, Req3} = read_big_file(Req2),
-            {file, Field, Filename, _CT, _Enc} = cow_multipart:form_data(Headers),
+            {file, Field, Filename, _CT } = cow_multipart:form_data(Headers),
             multipart(Req3, [{Field, {binary_to_list(Filename), Body}}|Res]);
         {done, Req2} ->
             {Res, Req2}
@@ -407,41 +408,41 @@ read_big_file(Req) ->
     read_big_file(Req, <<>>).
 
 read_big_file(Req, Acc) ->
-    case cowboy_req:part_body(Req) of
+    case cowboy_req:read_part_body(Req) of
         {ok, Body, Req2} -> {ok, <<Acc/binary, Body/binary>>, Req2};
         {more, Body, Req2} -> read_big_file(Req2, <<Acc/binary, Body/binary>>)
     end.
 
 reply_json(Code, Map, Req) ->
     case Code of
-        200 -> lager:info( "[ RESPONSE ] : ~p ~p", [Code, Map]);
-        _   -> lager:error("[ RESPONSE ] : ~p ~p~n~p", [Code, Map, Req])
+        200 -> logger:info( "[ RESPONSE ] : ~tp ~tp", [Code, Map]);
+        _   -> logger:error("[ RESPONSE ] : ~tp ~tp~n~tp", [Code, Map, Req])
     end,
-    cowboy_req:reply(Code, [{<<"content-type">>, <<"application/json">>}], jiffy:encode(Map), Req).
+    cowboy_req:reply(Code, #{<<"content-type">> => <<"application/json">>}, jiffy:encode(Map), Req).
 
 reply_redirect(Code, URI, Req) ->
-    lager:info("[ REDIRECT ] ~p -> ~p", [Code, URI]),
-    cowboy_req:reply(Code, [{<<"Location">>, iolist_to_binary(URI)}], <<"Authenticated">>, Req).
+    logger:info("[ REDIRECT ] ~tp -> ~tp", [Code, URI]),
+    cowboy_req:reply(Code, #{<<"Location">> => iolist_to_binary(URI)}, <<"Authenticated">>, Req).
 
 reply_error(HttpCode, Code, Description, Req) ->
     reply_json(HttpCode,
        #{
             reason_code => Code,
-            reason => list_to_binary(Description)
+            reason => iolist_to_binary(Description)
         }, Req).
 
 format_status(#{status:= failed, reason:= {crashed, _Reason}, config:= undefined}) ->
     #{status => failed, reason => crashed};
 format_status(#{status:= Status, start_time:= StartTime, finish_time:= FinishTime} = S) ->
     CreateTime = mzb_bc:maps_get(create_time, S, StartTime),
-    Data = #{status => Status, create_time => list_to_binary(iso_8601_fmt(CreateTime))},
+    Data = #{status => Status, create_time => iolist_to_binary(iso_8601_fmt(CreateTime))},
     Data1 = case StartTime of
         undefined -> Data;
-        _ -> Data#{start_time => list_to_binary(iso_8601_fmt(StartTime))}
+        _ -> Data#{start_time => iolist_to_binary(iso_8601_fmt(StartTime))}
     end,
     Data2 = case FinishTime of
         undefined -> Data1;
-        _ -> Data1#{finish_time => list_to_binary(iso_8601_fmt(FinishTime))}
+        _ -> Data1#{finish_time => iolist_to_binary(iso_8601_fmt(FinishTime))}
     end,
     Data2.
 
@@ -496,7 +497,7 @@ check_nodes(Nodes) when is_list(Nodes) -> {true, [binary_to_list(N) || N <- Node
 
 iso_8601_fmt(Seconds) ->
     {{Year,Month,Day},{Hour,Min,Sec}} = calendar:now_to_universal_time({Seconds div 1000000, Seconds rem 1000000, 0}),
-    io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+    mzb_string:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
         [Year, Month, Day, Hour, Min, Sec]).
 
 binary_to_bool(<<"true">>) -> true;
@@ -552,7 +553,7 @@ parse_start_params(Req) ->
                                     BinaryToValueFun(Value)
                                 catch
                                     _:_ ->
-                                        erlang:error({badarg, io_lib:format("Invalid value \"~s\" for ~s", [Value, ParamName])})
+                                        erlang:error({badarg, mzb_string:format("Invalid value \"~ts\" for ~ts", [Value, ParamName])})
                                 end;
                             [] -> DefaultValue
                         end;
@@ -565,7 +566,7 @@ parse_start_params(Req) ->
                                     ListOfBinariesToValueFun(L)
                                 catch
                                     _:_ ->
-                                        erlang:error({badarg, io_lib:format("Invalid value \"~p\" for ~s", [L, ParamName])})
+                                        erlang:error({badarg, mzb_string:format("Invalid value \"~tp\" for ~ts", [L, ParamName])})
                                 end
                         end
                 end

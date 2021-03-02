@@ -58,7 +58,7 @@ handle_call({unlock_hosts, Hosts}, _, #{hosts_locked := Locked} = State) ->
     {reply, ok, State#{hosts_locked => lists:subtract(Locked, Hosts)}};
 
 handle_call(Request, _From, State) ->
-    lager:error("Unhandled call: ~p ~p", [Request, State]),
+    logger:error("Unhandled call: ~tp ~tp", [Request, State]),
     {noreply, State}.
 
 handle_cast(_Msg, State) ->

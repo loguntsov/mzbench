@@ -34,7 +34,7 @@ allocate(Clouds, Config) ->
     Res = lists:all(
         fun ({ok, _, _, _}) -> true;
             ({error, {Name, N, Error}}) ->
-                lager:error("Can't allocate ~p nodes in ~p because of ~p", [N, Name, Error]),
+                logger:error("Can't allocate ~tp nodes in ~tp because of ~tp", [N, Name, Error]),
                 false
         end, CreateRes),
 
@@ -46,7 +46,7 @@ allocate(Clouds, Config) ->
                 end, {[], undefined, []}, CreateRes),
             {ok, Ids, User, Hosts};
         false ->
-            lager:info("Unsuccessful multicluster creation: ~p~nResult: ~p", [Clouds, CreateRes]),
+            logger:info("Unsuccessful multicluster creation: ~tp~nResult: ~tp", [Clouds, CreateRes]),
             _ = mzb_lists:pmap(
                 fun ({error, _}) -> ok;
                     ({ok, Id, _, _}) ->

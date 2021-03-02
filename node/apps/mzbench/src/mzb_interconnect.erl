@@ -96,8 +96,8 @@ multi_call(Nodes, Req, Timeout) ->
             try call(N, Req, Timeout) of
                 R -> {ok, {N, R}}
             catch
-                _:Reason ->
-                    lager:error("Call ~p to ~p failed with reason: ~p~n~p", [Req, N, Reason, erlang:get_stacktrace()]),
+                _:Reason:ST ->
+                    lager:error("Call ~tp to ~tp failed with reason: ~tp~n~tp", [Req, N, Reason, ST]),
                     {bad, N}
             end
         end, Nodes),
@@ -133,7 +133,7 @@ init([Handler]) ->
     {ok, #s{nodes = #{}, connection_monitors = #{}, handler = Handler}}.
 
 handle_call({accept, Node, Role, Owner, Sender}, _From, #s{nodes = Nodes, connection_monitors = Mons, role = MyRole} = State) ->
-    system_log:info("Connection to ~p established", [Node]),
+    logger:info("Connection to ~tp established", [Node]),
     Ref = erlang:monitor(process, Owner),
     Director = case Role of
             director -> Node;
@@ -168,8 +168,8 @@ handle_call({call, Node, Req}, From, State) when Node == node() ->
         noreply -> {noreply, State};
         {reply, Res} -> {reply, {ok, Res}, State}
     catch
-        C:E ->
-            {reply, {exception, {C,E,erlang:get_stacktrace()}}, State}
+        C:E:ST ->
+            {reply, {exception, {C,E,ST}}, State}
     end;
 
 handle_call({call, Node, Req}, From, State) ->
@@ -181,8 +181,8 @@ handle_call({call_director, Req}, From, #s{role = director} = State) ->
         noreply -> {noreply, State};
         {reply, Res} -> {reply, {ok, Res}, State}
     catch
-        C:E ->
-            {reply, {exception, {C,E,erlang:get_stacktrace()}}, State}
+        C:E:ST ->
+            {reply, {exception, {C,E,ST}}, State}
     end;
 
 handle_call({call_director, _Req}, _From, #s{role = worker, director = undefined} = State) ->
@@ -262,8 +262,8 @@ handle_cast({from_remote, {call, {FromNode, From}, Msg}}, State) ->
         noreply -> ok;
         {reply, Res} -> ReplyFun(Res)
     catch
-        C:E ->
-            send_to(FromNode, {reply, From, {exception, {C,E,erlang:get_stacktrace()}}}, State)
+        C:E:ST ->
+            send_to(FromNode, {reply, From, {exception, {C,E,ST}}}, State)
     end,
     {noreply, State};
 
@@ -272,7 +272,7 @@ handle_cast({from_remote, {transit, To, Msg}}, #s{role = director} = State) ->
     {noreply, State};
 
 handle_cast({from_remote, {transit, To, Msg}}, State) ->
-    system_log:error("Transit message for ~p on non director node: ~p~nMessage: ~p", [To, node(), Msg]),
+    logger:error("Transit message for ~tp on non director node: ~tp~nMessage: ~tp", [To, node(), Msg]),
     {noreply, State};
 
 handle_cast({from_remote, {reply, From, Res}}, State) ->
@@ -302,15 +302,15 @@ handle_cast(_Msg, State) ->
 handle_message(Msg, State) -> handle_message(Msg, fun (_) -> ok end, State).
 
 handle_message(Msg, _, #s{handler = undefined}) ->
-    system_log:warning("Ignoring msg due to undefined handler~nMessage: ~p", [Msg]),
+    logger:warning("Ignoring msg due to undefined handler~nMessage: ~tp", [Msg]),
     noreply;
 handle_message(Msg, ReplyFun, #s{handler  = Handler}) ->
     try Handler(Msg, ReplyFun) of
         {reply, Res} -> {reply, Res};
         noreply -> noreply
     catch
-        _:E ->
-            system_log:error("Handler for ~p has crashed at ~p: ~p~n~p", [Msg, node(), E, erlang:get_stacktrace()]),
+        _:E:ST ->
+            logger:error("Handler for ~tp has crashed at ~tp: ~tp~n~tp", [Msg, node(), E, ST]),
             noreply
     end.
 
@@ -320,7 +320,7 @@ handle_info({'DOWN', Ref, _, _, Reason}, #s{nodes = Nodes,
                                             local_monitors = LMons} = State) ->
     case maps:find(Ref, Mons) of
         {ok, Node} ->
-            system_log:warning("Node ~p disconnected: ~p", [Node, Reason]),
+            logger:warning("Node ~tp disconnected: ~tp", [Node, Reason]),
 
             NewState = lists:foldl(
                 fun ({R, {Owner, Pid}}, Acc) ->
@@ -383,7 +383,7 @@ send_to(To, Msg, #s{role = Role, nodes = Nodes, director = Director}) ->
                 error -> erlang:error(node_not_found)
             end;
         error when Role == director ->
-            system_log:warning("Skip msg for unknown node: ~p~nMessage: ~p", [To, Msg]),
+            logger:warning("Skip msg for unknown node: ~tp~nMessage: ~tp", [To, Msg]),
             ok
     end.
 

@@ -21,19 +21,18 @@ run_bench(ScriptPath, DefaultEnv) ->
         case start_director(Body, Nodes, Env, fun () -> ok end) of
             {ok, _, _} -> ok;
             {ok, _} -> ok;
-            {error, Error} -> erlang:error({error, [mzb_string:format("Unable to start director supervisor: ~p", [Error])]})
+            {error, Error} -> erlang:error({error, [mzb_string:format("Unable to start director supervisor: ~tp", [Error])]})
         end
     catch _C:{error, Errors} = E when is_list(Errors) -> E;
-          C:E ->
-              ST = erlang:get_stacktrace(),
-              system_log:error("Failed to run benchmark ~p:~p~n~p", [C, E, ST]),
+          C:E:ST ->
+              logger:error("Failed to run benchmark ~tp:~tp~n~tp", [C, E, ST]),
               {error, [mzb_string:format("Failed to run benchmark", [])]}
     end.
 
 read_and_validate(Path, Env) ->
     case mzb_script_validator:read_and_validate(Path, Env) of
         {ok, Warnings, Body, NewEnv} ->
-            lists:foreach(fun (Msg) -> system_log:warning("~s", [Msg]) end, Warnings),
+            lists:foreach(fun (Msg) -> logger:warning("~ts", [Msg]) end, Warnings),
             {Body, NewEnv};
         {error, _, _, _, Errors} -> erlang:error({error, Errors})
     end.
@@ -43,8 +42,8 @@ is_ready() ->
         Apps = application:which_applications(),
         false =/= lists:keyfind(mzbench, 1, Apps)
     catch
-        _:Error ->
-            system_log:error("is_ready exception: ~p~nStacktrace: ~p", [Error, erlang:get_stacktrace()]),
+        _:Error:ST ->
+            logger:error("is_ready exception: ~tp~nStacktrace: ~tp", [Error, ST]),
             false
     end.
 
@@ -52,9 +51,8 @@ get_results() ->
     try
         mzb_director:attach()
     catch
-        _:E ->
-            ST = erlang:get_stacktrace(),
-            Str = mzb_string:format("Unexpected error: ~p~n~p", [E, ST]),
+        _:E:ST ->
+            Str = mzb_string:format("Unexpected error: ~tp~n~tp", [E, ST]),
             {error, {unexpected_error, E, ST}, Str, {[], []}}
     end.
 
@@ -65,7 +63,7 @@ start_pool(Pool, Env, NumNodes, Offset) ->
 %%% Supervisor callbacks
 %%%===================================================================
 init([]) ->
-    system_log:info("[ mzb_bench_sup ] I'm at ~p", [self()]),
+    logger:info("[ mzb_bench_sup ] I'm at ~tp", [self()]),
     {ok, {{one_for_all, 0, 1}, [
         child_spec(signaler, mzb_signaler, [], permanent)
     ]}}.
@@ -78,7 +76,7 @@ child_spec(Name, Module, Args, Restart) ->
 
 start_director(Body, Nodes, Env, Continuation) ->
     BenchName = mzbl_script:get_benchname(mzbl_script:get_real_script_name(Env)),
-    system_log:info("[ mzb_bench_sup ] Loading ~p Nodes: ~p", [BenchName, Nodes]),
+    logger:info("[ mzb_bench_sup ] Loading ~tp Nodes: ~tp", [BenchName, Nodes]),
     supervisor:start_child(?MODULE,
                             child_spec(director, mzb_director,
                                        [whereis(?MODULE), BenchName, Body, Nodes, Env, Continuation],

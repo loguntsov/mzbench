@@ -5,7 +5,7 @@ pool(size = 3,
     loop(time = 5 sec,
          rate = 1 rps,
          iterator = "i"):
-        print(sprintf("~p", [var("i")]))
+        print(sprintf("~tp", [var("i")]))
 
 # should output something like this:
 # 18:03:17.571 [info] <0.177.0> [ director ] Started all pools

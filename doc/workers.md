@@ -117,10 +117,10 @@ get(State, _Meta, URL) ->
         {ok, 200, _, _} ->
             mzb_metrics:notify({"http_ok", counter}, 1);
         {ok, _, _, _} = Reply ->
-            lager:error("GET failed: ~p", [Reply]),
+            lager:error("GET failed: ~tp", [Reply]),
             mzb_metrics:notify({"http_fail", counter}, 1);
         E ->
-            lager:error("hackney:request failed: ~p", [E]),
+            lager:error("hackney:request failed: ~tp", [E]),
             mzb_metrics:notify({"other_fail", counter}, 1)
     end,
     {nil, State}.

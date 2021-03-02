@@ -19,7 +19,7 @@ load(_) -> ok.
 -spec validate(worker_name()) -> [].
 validate(Name) ->
     SearchPaths = search_paths(Name),
-    system_log:info(SearchPaths),
+    logger:info(SearchPaths),
     Files = [filename:absname(filename:join(P, worker_filename(Name))) || P <- SearchPaths],
     lists:any(fun filelib:is_regular/1, Files),
     [].
@@ -46,7 +46,7 @@ stdlib() ->
 -spec inject({string(), fun()}, #luerl{}) -> #luerl{}.
 inject({FunName, Fun}, LuaState) ->
     FunPath = [<<"mzbench">>, list_to_binary(FunName)],
-    system_log:info("FunPath: ~p", [FunPath]),
+    logger:info("FunPath: ~tp", [FunPath]),
     luerl:set_table(
         FunPath,
         fun(Args, State) ->
@@ -62,7 +62,7 @@ init(Name) ->
     SearchPaths = search_paths(Name),
     case search_worker_file(Name, SearchPaths) of
         {error, not_found, Filename} ->
-            system_log:error("worker file ~p not found in ~p", [Filename, SearchPaths]),
+            logger:error("worker file ~tp not found in ~tp", [Filename, SearchPaths]),
             {error, worker_file_not_found};
         {ok, Filename} ->
             {T0, L1} = luerl_emul:alloc_table(luerl:init()),
@@ -82,7 +82,7 @@ terminate(Res, State) ->
 
 -spec metrics(worker_name()) -> [{string(), gauge | histogram | counter}].
 metrics(WorkerName) ->
-    system_log:info("trying to get metrics from module ~p", [WorkerName]),
+    logger:info("trying to get metrics from module ~tp", [WorkerName]),
     SearchPaths = search_paths(WorkerName),
     {ok, Filename} = search_worker_file(WorkerName, SearchPaths),
     {[], LuaWithUserCode} = luerl:dofile(Filename),
@@ -105,7 +105,7 @@ search_paths(Name) ->
     || P <- application:get_env(mzbench, workers_dirs, [])].
 
 -spec worker_filename(worker_name()) -> string().
-worker_filename(Name) -> mzb_string:format("~s_worker.lua", [Name]).
+worker_filename(Name) -> mzb_string:format("~ts_worker.lua", [Name]).
 
 -spec search_worker_file(worker_name(), [string()]) -> {ok, string()} | {error, not_found, worker_name()}.
 search_worker_file(Name, []) -> {error, not_found, Name};

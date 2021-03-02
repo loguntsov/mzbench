@@ -27,13 +27,12 @@ create_cluster(Opts = #{instance_user:= UserName}, NumNodes, Config) when is_int
         {ok, _} = erlcloud_ec2:create_tags(Ids, [{"Name", maps:get(purpose, Config, "")}], get_config(Opts)),
         StartedIds = wait_nodes_start(NumNodes, Ids, Opts, ?MAX_POLL_COUNT),
         {ok, [NewData]} = get_description(StartedIds, Opts, ?MAX_POLL_COUNT),
-        lager:info("~p", [NewData]),
+        logger:info("~tp", [NewData]),
         IPs = get_IPs(StartedIds, NewData),
         wait_nodes_ssh(IPs, ?MAX_POLL_COUNT),
         {ok, {Opts, Ids}, UserName, IPs}
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
+        C:E:ST ->
             destroy_cluster({Opts, Ids}),
             erlang:raise(C,E,ST)
     end.
@@ -66,14 +65,14 @@ get_IPs(Ids, Data, [H | T]) ->
 
 destroy_cluster({Opts, Ids}) ->
     R = erlcloud_ec2:terminate_instances(Ids, get_config(Opts)),
-    lager:info("Deallocating ids: ~p, result: ~p", [Ids, R]),
+    logger:info("Deallocating ids: ~tp, result: ~tp", [Ids, R]),
     {ok, _} = R,
     ok.
 
 wait_nodes_ssh(_, C) when C < 0 -> erlang:error({ec2_error, cluster_ssh_start_timed_out});
 wait_nodes_ssh([], _) -> ok;
 wait_nodes_ssh([H | T], C) ->
-    lager:info("Checking port 22 on ~p", [H]),
+    logger:info("Checking port 22 on ~tp", [H]),
     R = gen_tcp:connect(H, 22, [], ?POLL_INTERVAL),
     case R of
         {ok, Socket} -> gen_tcp:close(Socket), wait_nodes_ssh(T, C);
@@ -84,7 +83,7 @@ wait_nodes_start(_, _, _, C) when C < 0 -> erlang:error({ec2_error, cluster_star
 wait_nodes_start(0, _, _, _) -> [];
 wait_nodes_start(N, [H | T], Opts, C) ->
     {ok, Res} = erlcloud_ec2:describe_instance_status([{"InstanceId", H}], [], get_config(Opts)),
-    lager:info("Waiting nodes result: ~p", [Res]),
+    logger:info("Waiting nodes result: ~tp", [Res]),
     Status = case Res of
         [P | _] -> proplists:get_value(instance_state_name, P);
              _  -> undefined

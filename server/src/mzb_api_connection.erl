@@ -12,24 +12,24 @@ start_and_link_with(PidToLinkWith, Purpose, Host, Port, Dispatcher, State) ->
         link(PidToLinkWith),
         try gen_tcp:connect(Host, Port, [{active, false}, {packet, 4}, binary]) of
             {ok, Socket} ->
-                lager:info("Connection is started for ~p on ~s", [Purpose, Host]),
+                logger:info("Connection is started for ~tp on ~ts", [Purpose, Host]),
                 Self ! {self(), connected, Socket},
                 process_data(Purpose, Host, Socket, Dispatcher, State);
             {error, Reason} ->
                 Self ! {self(), failed, Reason}
         catch
-            C:E ->
-                ST = erlang:get_stacktrace(),
+            C:E:ST ->
+                logger:info("Error ~p:~p ~p", [C, E, ST ]),
                 Self ! {self(), failed, {C, E, ST}}
         end
     end),
     receive
         {Pid, connected, Socket} -> {Pid, Socket, Purpose, Host};
         {Pid, failed, Reason} ->
-            lager:error("Connection '~p' is failed to start on host ~s with reason ~p", [Purpose, Host, Reason]),
+            logger:error("Connection '~tp' is failed to start on host ~ts with reason ~tp", [Purpose, Host, Reason]),
             erlang:error({catch_collector_connect_failed, Host, Reason})
     after 30000 ->
-        lager:error("Connection '~p' is timed-out to start on host ~s", [Purpose, Host]),
+        logger:error("Connection '~tp' is timed-out to start on host ~ts", [Purpose, Host]),
         erlang:error({catch_collector_connect_timedout, Host})
     end.
 
@@ -56,9 +56,9 @@ process_data(Purpose, Host, Socket, Dispatcher, State) ->
             {ok, NewState} = Dispatcher({message, Data}, State),
             process_data(Purpose, Host, Socket, Dispatcher, NewState);
         {error, closed} ->
-            lager:info("Connection '~p' is closed on host ~s", [Purpose, Host]),
+            logger:info("Connection '~tp' is closed on host ~ts", [Purpose, Host]),
             Dispatcher({error, closed}, State);
         {error, Reason} ->
-            lager:error("Connection '~p' is failed on host ~s with reason ~p", [Purpose, Host, Reason]),
+            logger:error("Connection '~tp' is failed on host ~ts with reason ~tp", [Purpose, Host, Reason]),
             Dispatcher({error, Reason}, State)
     end.

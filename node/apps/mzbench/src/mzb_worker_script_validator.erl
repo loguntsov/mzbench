@@ -24,7 +24,7 @@ validate_expr(#operation{} = Op, Worker) ->
             validate_expr(Exprs, Worker);
            (X) ->
             [mzb_string:format(
-                mzbl_script:meta_to_location_string(Meta) ++ "Expected list of expressions but got ~p.",
+                mzbl_script:meta_to_location_string(Meta) ++ "Expected list of expressions but got ~tp.",
                 [X])]
         end,
     AddLocation =
@@ -45,11 +45,11 @@ validate_expr(#operation{} = Op, Worker) ->
                 {_, ok} -> ValidateList(Args);
                 {_, bad_arity} ->
                     AddLocation([mzb_string:format(
-                                                 "Function with wrong arity ~p:~p/~p.",
+                                                 "Function with wrong arity ~tp:~tp/~tp.",
                                                  [Worker, Fn, Arity])]);
                 {_, _} ->
                     AddLocation([mzb_string:format(
-                                                 "Unknown function ~p/~p.",
+                                                 "Unknown function ~tp/~tp.",
                                                  [Fn, Arity])])
             end
     end;

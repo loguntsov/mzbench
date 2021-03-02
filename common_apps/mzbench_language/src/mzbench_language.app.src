@@ -1,7 +1,6 @@
-{application, mzbench_language,
- [
+{application, mzbench_language, [
   {description, ""},
   {vsn, "1.0.0"},
   {registered, []},
-  {applications, [kernel, stdlib, inets, lager, sasl, pretty_errors, mzbench_utils, jiffy]}
- ]}.
+  {applications, [kernel, stdlib, inets, sasl, pretty_errors, mzbench_utils, jiffy]}
+]}.

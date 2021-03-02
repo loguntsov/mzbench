@@ -68,7 +68,7 @@ print_loop_iterator_test() ->
         "[{loop, [{time, {1100, ms}},
                   {iterator, \"i\"},
                   {rate, {4, rps}}],
-           [{test_method, {sprintf, \"~p~w\", [{var, \"i\"}, {numvar, \"i\"}]}}]}].",
+           [{test_method, {sprintf, \"~tp~w\", [{var, \"i\"}, {numvar, \"i\"}]}}]}].",
     ?assertEqual("4433221100", catch run(Script)).
 
 empty_loop_test() ->
@@ -115,7 +115,7 @@ error_test() ->
     ?assertError({mzbl_interpreter_runtime_error, {{error, "Error successfully failed."}, {dummy_worker, "BARFOO"}}}, run(Script)).
 
 tuple_test() ->
-    Script = "[{test_method, {sprintf, \"~p\", [{t, {test_method, \"Foo\"}, 2, 3}]}}].",
+    Script = "[{test_method, {sprintf, \"~tp\", [{t, {test_method, \"Foo\"}, 2, 3}]}}].",
     ?assertEqual("{nil,2,3}Foo", catch run(Script)).
 
 round_robin_test_() ->
@@ -129,7 +129,7 @@ round_robin_test_() ->
      ].
 
 sequence_test() ->
-    Script = "[{test_method, {sprintf, \"~p\", [{seq, 1, 7}]}}].",
+    Script = "[{test_method, {sprintf, \"~tp\", [{seq, 1, 7}]}}].",
     ?assertEqual("[1,2,3,4,5,6,7]", catch run(Script)).
 
 eval_std_test() ->
@@ -150,7 +150,7 @@ eval_std_compiled_test() ->
     ?assertEqual([5,6,7,8,9,10,11], R).
 
 eval_replace_int_with_float_test() ->
-    Script = "{sprintf, \"~p\", [{numvar, \"V1\"}]}.",
+    Script = "{sprintf, \"~tp\", [{numvar, \"V1\"}]}.",
     AST = mzbl_script:parse(Script),
     Env1 = [{"V1", "5"}],
     NewAST = compile_and_load(AST, Env1),
@@ -164,7 +164,7 @@ eval_replace_int_with_float_test() ->
 compile_and_load(AST, Env) ->
     {NewAST, Modules} = mzb_compiler:compile(AST, Env),
     lists:foreach(fun ({Mod, Bin}) ->
-            {module, _} = code:load_binary(Mod, mzb_string:format("~s.erl", [Mod]), Bin)
+            {module, _} = code:load_binary(Mod, mzb_string:format("~ts.erl", [Mod]), Bin)
         end, Modules),
     NewAST.
 

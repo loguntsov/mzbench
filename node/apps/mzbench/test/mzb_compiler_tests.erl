@@ -5,7 +5,7 @@ compile_id_test() ->
     Simple = "[{pool, [{size, 1}], []}].",
     _ = compile_check(Simple, []),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(0 + 2, length(mzb_compiled_vars:module_info(exports))).
 
 compile_var_string_test() ->
@@ -13,7 +13,7 @@ compile_var_string_test() ->
         "{print, {var, \"foo\"}}.",
         [{"foo", "bar"}]),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(true , lists:member({foo, 0}, Functions)).
 
 compile_var_int_test() ->
@@ -21,7 +21,7 @@ compile_var_int_test() ->
         "{print, {var, \"foo\"}}.",
         [{"foo", 42}]),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(true , lists:member({foo, 0}, Functions)).
 
 compile_numvar_test() ->
@@ -29,7 +29,7 @@ compile_numvar_test() ->
         "{print, {numvar, \"foo\"}}.",
         [{"foo", "42"}]),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(42, mzb_compiled_vars:foo()).
 
 compile_rate_test() ->
@@ -37,7 +37,7 @@ compile_rate_test() ->
         "{{var, \"foo\"}, rps}.",
         [{"foo", 42}]),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(true , lists:member({foo, 0}, Functions)).
 
 
@@ -47,7 +47,7 @@ compile_var_string_to_int_default_test() ->
         [{"foo", "42"}]),
 
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(42, mzb_compiled_vars:foo()).
 
 compile_var_string_to_int_default2_test() ->
@@ -56,7 +56,7 @@ compile_var_string_to_int_default2_test() ->
         []),
 
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(1, mzb_compiled_vars:foo()).
 
 compile_var_int_to_atom_default_test() ->
@@ -64,7 +64,7 @@ compile_var_int_to_atom_default_test() ->
         "{print, {var, \"foo\", undefined}}.",
         [{"foo", 1}]),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(1, mzb_compiled_vars:foo()).
 
 compile_var_float_to_atom_default_test() ->
@@ -72,25 +72,25 @@ compile_var_float_to_atom_default_test() ->
         "{print, {var, \"foo\", undefined}}.",
         [{"foo", 3.14}]),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(3.14, mzb_compiled_vars:foo()).
 
 compile_missing_var_is_a_failure_test() ->
     _ = compile_check("{print, {var, \"foo\"}}.", []),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(0 + 2, length(mzb_compiled_vars:module_info(exports))).
 
 compile_using_iterator_as_var_test() ->
     _ = compile_check("{loop, [{iterator, \"i\"}], {var, \"i\"}}.", []),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(0 + 2, length(mzb_compiled_vars:module_info(exports))).
 
 compile_using_iterator_as_numvar_test() ->
     _ = compile_check("{loop, [{iterator, \"i\"}], {numvar, \"i\"}}.", []),
     Functions = mzb_compiled_vars:module_info(exports),
-    io:format("~p", [Functions]),
+    io:format("~tp", [Functions]),
     ?assertEqual(0 + 2, length(mzb_compiled_vars:module_info(exports))).
 
 
@@ -98,7 +98,7 @@ compile_check(Input, Env) ->
     AST = mzbl_script:parse(Input),
     {NewScript, Modules} = mzb_compiler:compile(AST, Env),
     lists:foreach(fun ({Mod, Bin}) ->
-            {module, _} = code:load_binary(Mod, mzb_string:format("~s.erl", [Mod]), Bin)
+            {module, _} = code:load_binary(Mod, mzb_string:format("~ts.erl", [Mod]), Bin)
         end, Modules),
     NewScript.
 

@@ -51,7 +51,7 @@ init([Pool, Env, NumNodes, Offset]) ->
     {ok, start_workers(Pool, Env, NumNodes, Offset, State)}.
 
 handle_call(stop, _From, #s{workers = Tid, name = Name} = State) ->
-    system_log:info("[ ~p ] Received stop signal", [Name]),
+    logger:info("[ ~tp ] Received stop signal", [Name]),
     ets:foldl(
         fun ({Pid, Ref}, Acc) ->
             erlang:demonitor(Ref, [flush]),
@@ -62,7 +62,7 @@ handle_call(stop, _From, #s{workers = Tid, name = Name} = State) ->
     {stop, normal, ok, State};
 
 handle_call(Req, _From, State) ->
-    system_log:error("Unhandled call: ~p", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 handle_cast({start_worker, WorkerScript, Env, Worker, Node, WId}, #s{workers = Tid, name = PoolName} = State) ->
@@ -72,8 +72,8 @@ handle_cast({start_worker, WorkerScript, Env, Worker, Node, WId}, #s{workers = T
         end),
     ets:insert(Tid, {P, Ref}),
     if
-        WId < 4 -> system_log:info("Starting worker on ~p no ~p", [Node, WId]);
-        WId =:= 4 -> system_log:info("Starting remaining workers...", []);
+        WId < 4 -> logger:info("Starting worker on ~tp no ~tp", [Node, WId]);
+        WId =:= 4 -> logger:info("Starting remaining workers...", []);
         true -> ok
     end,
     {noreply, State};
@@ -93,7 +93,7 @@ handle_cast({run_command, PoolNum, Percent, AST}, #s{name = PoolName, workers = 
     {noreply, State};
 
 handle_cast(Msg, State) ->
-    system_log:error("Unhandled cast: ~p", [Msg]),
+    logger:error("Unhandled cast: ~tp", [Msg]),
     {stop, {unhandled_cast, Msg}, State}.
 
 handle_info(poll_vars, #s{name = Name,
@@ -107,14 +107,14 @@ handle_info(poll_vars, #s{name = Name,
     NewState =
         if
             WorkerNumber > CurrentPoolSize ->
-                system_log:info("[ ~p ] Increasing the number of workers at ~p ~b -> ~b", [Name, node(), CurrentPoolSize, WorkerNumber]),
+                logger:info("[ ~tp ] Increasing the number of workers at ~tp ~b -> ~b", [Name, node(), CurrentPoolSize, WorkerNumber]),
                 WorkerStarter =
                     erlang:spawn_monitor(fun () ->
                         WorkerStartFun(WorkerNumber - CurrentPoolSize, CurrentPoolSize)
                     end),
                 State#s{current_pool_size = WorkerNumber, worker_starter = WorkerStarter};
             WorkerNumber < CurrentPoolSize ->
-                system_log:info("[ ~p ] Decreasing the number of workers at ~p ~b -> ~b", [Name, node(), CurrentPoolSize, WorkerNumber]),
+                logger:info("[ ~tp ] Decreasing the number of workers at ~tp ~b -> ~b", [Name, node(), CurrentPoolSize, WorkerNumber]),
                 kill_some_workers(CurrentPoolSize - WorkerNumber, Tid),
                 State#s{current_pool_size = WorkerNumber};
             true ->
@@ -130,7 +130,7 @@ handle_info({'DOWN', Ref, _, _, normal}, #s{worker_starter = {_, Ref}} = State) 
     maybe_stop(State#s{worker_starter = undefined});
 
 handle_info({'DOWN', Ref, _, _, Reason}, #s{worker_starter = {_, Ref}} = State) ->
-    system_log:error("Worker starter has crashed with the reason: ~p", [Reason]),
+    logger:error("Worker starter has crashed with the reason: ~tp", [Reason]),
     {stop, Reason, State};
 
 handle_info({worker_result, _Pid, {ok, _}}, #s{} = State) ->
@@ -148,11 +148,11 @@ handle_info({'DOWN', _Ref, _, Pid, killed_by_pool}, #s{workers = Workers, name =
     NewState = State#s{stopped = State#s.stopped + 1},
     case ets:lookup(Workers, Pid) of
         [{Pid, Ref}] ->
-            ok = mzb_metrics:notify(mzb_string:format("workers.~s.ended", [Name]), 1),
+            ok = mzb_metrics:notify(mzb_string:format("workers.~ts.ended", [Name]), 1),
             ets:delete(Workers, Pid),
             erlang:demonitor(Ref, [flush]);
         _ ->
-            system_log:error("[ ~p ] Received DOWN from unknown process: ~p", [Name, Pid])
+            logger:error("[ ~tp ] Received DOWN from unknown process: ~tp", [Name, Pid])
     end,
     maybe_stop(NewState);
 
@@ -160,16 +160,16 @@ handle_info({'DOWN', _Ref, _, Pid, Reason}, #s{workers = Workers, name = Name} =
     NewState = State#s{failed = State#s.failed + 1},
     case ets:lookup(Workers, Pid) of
         [{Pid, Ref}] ->
-            system_log:error("[ ~p ] Received DOWN from worker ~p with reason ~p", [Name, Pid, Reason]),
+            logger:error("[ ~tp ] Received DOWN from worker ~tp with reason ~tp", [Name, Pid, Reason]),
             ets:delete(Workers, Pid),
             erlang:demonitor(Ref, [flush]);
         _ ->
-            system_log:error("[ ~p ] Received DOWN from unknown process: ~p / ~p", [Name, Pid, Reason])
+            logger:error("[ ~tp ] Received DOWN from unknown process: ~tp / ~tp", [Name, Pid, Reason])
     end,
     maybe_stop(NewState);
 
 handle_info(Info, State) ->
-    system_log:error("Unhandled info: ~p", [Info]),
+    logger:error("Unhandled info: ~tp", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -237,7 +237,7 @@ eval_worker_number(Pool, Env, NumNodes, Offset) ->
                 [S, PN] when PN * Offset > S -> 0;
                 [S, PN] when NumNodes * PN >= S -> S;
                 [S, PN] ->
-                    system_log:error("Need more nodes, required = ~p, actual = ~p",
+                    logger:error("Need more nodes, required = ~tp, actual = ~tp",
                         [mzb_utility:int_ceil(S/PN), NumNodes]),
                     erlang:error({not_enough_nodes})
             end,
@@ -256,14 +256,14 @@ load_worker({WorkerProvider, Worker}) ->
     case erlang:apply(WorkerProvider, load, [Worker]) of
         ok -> ok;
         {error, Reason} ->
-            system_log:error("Worker ~p load failed with reason: ~p", [Worker, Reason]),
+            logger:error("Worker ~tp load failed with reason: ~tp", [Worker, Reason]),
             erlang:error({application_start_failed, Worker, Reason})
     end.
 
 maybe_stop(#s{workers = Workers, name = Name, worker_starter = undefined} = State) ->
     case ets:first(Workers) == '$end_of_table' of
         true ->
-            system_log:info("[ ~p ] All workers have finished", [Name]),
+            logger:info("[ ~tp ] All workers have finished", [Name]),
             Info = [{succeed_workers, State#s.succeed},
                     {failed_workers,  State#s.failed},
                     {stopped_workers, State#s.stopped}],
@@ -277,9 +277,9 @@ maybe_stop(#s{} = State) ->
 
 maybe_report_error(_, {ok, _}) -> ok;
 maybe_report_error(Pid, {error, Reason}) ->
-    system_log:error("Worker ~p has finished abnormally: ~p", [Pid, Reason]);
+    logger:error("Worker ~tp has finished abnormally: ~tp", [Pid, Reason]);
 maybe_report_error(Pid, {exception, Node, {_C, E, ST}, WorkerState}) ->
-    system_log:error("Worker ~p on ~p has crashed: ~p~nStacktrace: ~p~nState of worker: ~p", [Pid, Node, E, ST, WorkerState]).
+    logger:error("Worker ~tp on ~tp has crashed: ~tp~nStacktrace: ~tp~nState of worker: ~tp", [Pid, Node, E, ST, WorkerState]).
 
 sleep_off(StartTime, ShouldBe) ->
     Current = msnow() - StartTime,

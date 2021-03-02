@@ -4,6 +4,6 @@
             {worker_type, dummy_worker}],
         [
             {test_proplist, [{t, test, true}]},
-            {print, {sprintf, "~p", [{t, elem1, elem2}]}}
+            {print, {sprintf, "~tp", [{t, elem1, elem2}]}}
         ]} % function input is {elem1, elem2}
 ].

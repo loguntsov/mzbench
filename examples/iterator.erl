@@ -4,7 +4,7 @@
         [{loop, [{time, {5, sec}},
                  {rate, {1, rps}},
                  {iterator, "i"}],
-            [{print, {sprintf, "~p", [{var, "i"}]}}]}]}
+            [{print, {sprintf, "~tp", [{var, "i"}]}}]}]}
 ].
 
 % should output something like this:

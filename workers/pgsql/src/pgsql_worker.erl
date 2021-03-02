@@ -36,7 +36,7 @@ query(#s{connection = C} = State, _Meta, Group, Statement) ->
     State2 = add_metric_group(State, Group),
     TimeStart = os:timestamp(),
     case tuple_to_list(epgsql:squery(C, Statement)) of
-        [error | E] -> lager:error("Error: ~p", [E]),
+        [error | E] -> lager:error("Error: ~tp", [E]),
                     mzb_metrics:notify(Group ++ ".error", 1);
         [ok | _] -> mzb_metrics:notify(Group ++ ".ok", 1)
     end,

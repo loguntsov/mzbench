@@ -84,7 +84,7 @@ get_all_signals() ->
 %%%===================================================================
 
 init([]) ->
-    system_log:info("Signal server has been started"),
+    logger:info("Signal server has been started"),
     _ = ets:new(?MODULE, [set, named_table, public, {read_concurrency, true}]),
     timer:send_after(?TICK_TIMER, self(), tick),
     {ok, #s{}}.
@@ -104,7 +104,7 @@ handle_call({check, Name, Count}, From, #s{queue = Q} = State) ->
              {noreply, State#s{queue = [{Name, From, Count} | Q]}}
     end;
 handle_call(Req, _From, State) ->
-    system_log:error("Unhandled call: ~p", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 handle_cast({add_local, Name, Count}, #s{queue = Q} = State) ->
@@ -117,7 +117,7 @@ handle_cast({add_local, Name, Count}, #s{queue = Q} = State) ->
     _ = lists:map(fun(From) -> gen_server:reply(From, ok) end, W),
     {noreply, State#s{queue = [{N, F, C} || {N, F, C} <- Q, (N =/= Name) or (C > NewC)]}};
 handle_cast(Msg, State) ->
-    system_log:error("Unhandled cast: ~p", [Msg]),
+    logger:error("Unhandled cast: ~tp", [Msg]),
     {stop, {unhandled_cast, Msg}, State}.
 
 handle_info(tick, #s{nodes = Nodes} = State) ->
@@ -133,7 +133,7 @@ handle_info(tick, #s{nodes = Nodes} = State) ->
     {noreply, State};
 
 handle_info(Info, State) ->
-    system_log:error("Unhandled info: ~p", [Info]),
+    logger:error("Unhandled info: ~tp", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

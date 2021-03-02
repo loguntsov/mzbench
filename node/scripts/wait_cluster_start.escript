@@ -9,7 +9,7 @@ add_libs() ->
     code:add_pathsz(CodePaths).
 
 main([Hostname, TimeoutStr | NodesStr]) ->
-    io:format("~p starting~n", [os:timestamp()]),
+    io:format("~tp starting~n", [os:timestamp()]),
 
     add_libs(),
     ok = application:load(mzbench_utils),
@@ -31,11 +31,11 @@ main([Hostname, TimeoutStr | NodesStr]) ->
     init_net_kernel(Hostname),
 
     true = ensure_hostnames_are_resolvable(Hostnames),
-    io:format("~p hostnames are resolvable~n", [os:timestamp()]),
+    io:format("~tp hostnames are resolvable~n", [os:timestamp()]),
     true = ensure_hostnames_are_reachable_from_director(Hostnames),
-    io:format("~p hostnames are reachable~n", [os:timestamp()]),
+    io:format("~tp hostnames are reachable~n", [os:timestamp()]),
     ok = is_nodes_ready(Nodes),
-    io:format("~p nodes are ready~n", [os:timestamp()]),
+    io:format("~tp nodes are ready~n", [os:timestamp()]),
 
     connect_nodes(Nodes);
 
@@ -48,12 +48,12 @@ ensure_hostnames_are_reachable_from_director(Hostnames) ->
         fun(X) -> X end,
         mzb_lists:pmap(
             fun(Hostname) ->
-                Cmd = lists:flatten(io_lib:format("ping -qc1 ~s", [Hostname])),
+                Cmd = lists:flatten(io_lib:format("ping -qc1 ~ts", [Hostname])),
                 {Code, Output} = cmd(Cmd),
                 case Code of
                     0 -> true;
                     _ ->
-                        io:format("can't reach ~p, code ~p, output: ~p~n",
+                        io:format("can't reach ~tp, code ~tp, output: ~tp~n",
                             [Hostname, Code, Output]),
                         false
                 end
@@ -68,7 +68,7 @@ ensure_hostnames_are_resolvable(Nodes) ->
                 case inet:gethostbyname(Node) of
                     {ok, _} -> true;
                     Error ->
-                        io:format("can't resolve hostname ~p: ~p~n", [Node, Error]),
+                        io:format("can't resolve hostname ~tp: ~tp~n", [Node, Error]),
                         false
                 end
             end,
@@ -84,16 +84,16 @@ is_nodes_ready(Nodes) ->
     is_nodes_ready(NewNodes).
 
 bad_arg(Name, Val) ->
-    io:format("Invalid ~s: ~s~n", [Name, Val]),
+    io:format("Invalid ~ts: ~ts~n", [Name, Val]),
     usage().
 
 usage() ->
-    io:format("Usage: ~s Timeout Host1 [ Host2 [ Host3 ...]]~n", [escript:script_name()]),
+    io:format("Usage: ~ts Timeout Host1 [ Host2 [ Host3 ...]]~n", [escript:script_name()]),
     halt(1).
 
 nodename_gen(Hostname) ->
     {N1,N2,N3} = erlang:now(),
-    Str = lists:flatten(io_lib:format("~p-~p~p@~s", [N1,N2,N3,Hostname])),
+    Str = lists:flatten(io_lib:format("~tp-~tp~tp@~ts", [N1,N2,N3,Hostname])),
     erlang:list_to_atom(Str).
 
 init_net_kernel(Hostname) ->
@@ -121,12 +121,12 @@ is_node_ready(Node) ->
             false -> false
         end
     catch
-        _:E ->
-            io:format("is_node_ready exception: ~p~n~p", [E, erlang:get_stacktrace()]),
+        _:E:ST ->
+            io:format("is_node_ready exception: ~tp~n~tp", [E, ST]),
             false
     end,
 
-    Res == true andalso io:format("Node ~p is ready~n", [Node]),
+    Res == true andalso io:format("Node ~tp is ready~n", [Node]),
 
     Res.
 
@@ -136,7 +136,7 @@ receive_answer(Ref) ->
     end.
 
 stop(Pid, Reason) ->
-    io:format("unexpected stop: ~s~n", [Reason]),
+    io:format("unexpected stop: ~ts~n", [Reason]),
     erlang:exit(Pid, Reason),
     halt(1).
 
@@ -146,7 +146,7 @@ connect_nodes(Nodes = [N | _]) ->
         [] ->
             io:format("All nodes are connected~n");
         List ->
-            io:format("Several nodes are not connected: ~p~n", [List]),
+            io:format("Several nodes are not connected: ~tp~n", [List]),
             halt(1)
     end.
 

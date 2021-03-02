@@ -4,11 +4,11 @@ main([BenchDir]) ->
     StatusFile = filename:join(BenchDir, "status"),
     case file:consult(StatusFile) of
         {ok, [Status]} ->
-            NewStatusContent = io_lib:format("~p.", [migrate(Status)]),
+            NewStatusContent = io_lib:format("~tp.", [migrate(Status)]),
             ok = file:write_file(StatusFile, NewStatusContent);
         {error, enoent} -> ok;
         {error, Reason} ->
-            io:format("Can't read status file: ~s with reason: ~p", [StatusFile, Reason]),
+            io:format("Can't read status file: ~ts with reason: ~tp", [StatusFile, Reason]),
             erlang:error({file_read_error, StatusFile, Reason})
     end.
 

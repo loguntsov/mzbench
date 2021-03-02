@@ -249,7 +249,7 @@ set_signal(State, _Env, _Meta, Name, Count) ->
          Meta :: meta(),
          Text :: term().
 dump(State, _Env, _Meta, Text) ->
-    lager:info("~p", [Text]),
+    lager:info("~tp", [Text]),
     {ok, State}.
 
 -spec concat(State, Env, Meta, Str1, Str2) -> {ResStr, State}

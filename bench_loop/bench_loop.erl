@@ -23,14 +23,14 @@ main(_Args) ->
     Stats = [[R, bench_rps(constant, R), bench_rps(ramp, R)]
         || R <- rates()],
     UnboundedRPS = bench_rps(unbounded, undefined),
-    io:format([io_lib:format("~p, ~p, ~p, ~p\n", Stat ++ [UnboundedRPS]) || Stat <- Stats]).
+    io:format([io_lib:format("~tp, ~tp, ~tp, ~tp\n", Stat ++ [UnboundedRPS]) || Stat <- Stats]).
 
 bench_rps(RateProfile, TargetRPS) ->
     Script = make_script(RateProfile, TargetRPS),
     {Iterations, Elapsed} = run(Script),
     ActualRPS = Iterations div duration(),
     io:format(standard_error,
-        "Expected ~p rps, got ~p rps, time elapsed ~p.~n",
+        "Expected ~tp rps, got ~tp rps, time elapsed ~tp.~n",
         [TargetRPS, ActualRPS, Elapsed div 1000]),
     ActualRPS.
 
@@ -39,15 +39,15 @@ make_script(RateProfile, TargetRPS) ->
         unbounded -> "";
         constant ->
             lists:flatten(io_lib:format(
-                ", {rate, {~p, rps}}",
+                ", {rate, {~tp, rps}}",
                 [TargetRPS]));
         ramp ->
             lists:flatten(io_lib:format(
-                ", {rate, {ramp, linear, {~p, rps}, {~p, rps}}}",
+                ", {rate, {ramp, linear, {~tp, rps}, {~tp, rps}}}",
                 [TargetRPS, TargetRPS + 1]))
     end,
     lists:flatten(io_lib:format(
-        "[{loop, [{time, {~p, sec}}~s],
+        "[{loop, [{time, {~tp, sec}}~ts],
            [{inc}]}].",
         [duration(), RateSpec])).
 

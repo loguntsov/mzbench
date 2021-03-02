@@ -170,7 +170,7 @@ init([Id, Params]) ->
         user_errors => 0,
         system_errors => 0
     },
-    info("Node repo: ~p", [NodeInstallSpec], State),
+    info("Node repo: ~tp", [NodeInstallSpec], State),
     {ok, State}.
 
 workflow_config(_State) ->
@@ -205,7 +205,7 @@ handle_stage(pipeline, init, #{config:= Config} = State) ->
         _ -> ok
     end,
 
-    info("Starting benchmark~n~p", [Config], State);
+    info("Starting benchmark~n~tp", [Config], State);
 
 handle_stage(pipeline, checking_script, #{config:= Config}) ->
     #{script:= #{body:= ScriptBody}} = Config,
@@ -227,8 +227,8 @@ handle_stage(pipeline, wait_exclusive, #{id:= Id, config:= Config}) ->
 handle_stage(pipeline, allocating_hosts, #{config:= Config} = State) ->
     {Hosts, UserName, Deallocator} = allocate_hosts(Config, get_logger(State)),
 
-    if length(Hosts) > 1 -> info("Allocated hosts: [~p] @~n~p", [UserName, Hosts], State);
-       true -> info("Allocated hosts: [~p] @ ~p", [UserName, Hosts], State)
+    if length(Hosts) > 1 -> info("Allocated hosts: [~tp] @~n~tp", [UserName, Hosts], State);
+       true -> info("Allocated hosts: [~tp] @ ~tp", [UserName, Hosts], State)
     end,
 
     fun (S) ->
@@ -283,7 +283,7 @@ handle_stage(pipeline, starting_collectors, #{cluster_connection:= Connection, n
     StartFun = fun (Call, Handler) ->
         mzb_lists:pmap(fun ({Node, Host}) ->
         {ok, Port} = director_call(Connection, {Call, Node}),
-        info("Log collector server: ~p -> ~p:~p", [Node, Host, Port], State),
+        info("Log collector server: ~tp -> ~tp:~tp", [Node, Host, Port], State),
         mzb_api_connection:start_and_link_with(Self, logs, Host, Port,
             fun ({message, Msg}, S) -> {Handler({write, Msg}), S};
                 (_, S) -> {ok, S}
@@ -303,7 +303,7 @@ handle_stage(pipeline, pre_hooks, #{cluster_connection:= Connection, config:= Co
         catch
             error:{error, List} ->
                 ResStr = string:join(List, "\n"),
-                error("~s", [ResStr], State),
+                error("~ts", [ResStr], State),
                 mzb_pipeline:error(validation_failed,
                                    fun (S) -> S#{result_str => ResStr} end)
 
@@ -323,7 +323,7 @@ handle_stage(pipeline, starting, #{cluster_connection:= Connection, config:= Con
     case director_call(Connection, {start_benchmark, remote_path(ScriptFilePath, Config), Env}) of
         ok -> ok;
         {error, List} ->
-            ResStr = mzb_string:format("Start failed: ~s", [string:join(List, "\n")]),
+            ResStr = mzb_string:format("Start failed: ~ts", [string:join(List, "\n")]),
             error(ResStr, [], State),
             mzb_pipeline:error(start_benchmark_failed,
                                fun (S) -> S#{result_str => ResStr} end)
@@ -332,16 +332,16 @@ handle_stage(pipeline, starting, #{cluster_connection:= Connection, config:= Con
 handle_stage(pipeline, running, #{cluster_connection:= Connection} = State) ->
     try director_call(Connection, get_results, infinity) of
         {ok, Str, {Metrics, Histograms}} ->
-            info("Benchmark result: SUCCESS~n~s", [Str], State),
+            info("Benchmark result: SUCCESS~n~ts", [Str], State),
             Res = aggregate_results(Metrics, Histograms, State),
             fun (S) -> S#{results => Res, result_str => Str} end;
         {error, Reason, ReasonStr, {Metrics, Histograms}} ->
-            error("Benchmark result: FAILED~n~s", [ReasonStr], State),
+            error("Benchmark result: FAILED~n~ts", [ReasonStr], State),
             Res = aggregate_results(Metrics, Histograms, State),
             mzb_pipeline:error({benchmark_failed, Reason}, fun (S) -> S#{results => Res, result_str => ReasonStr} end)
     catch
         _:Error ->
-            ResStr = mzb_string:format("Benchmark result: EXCEPTION~n~p", [Error]),
+            ResStr = mzb_string:format("Benchmark result: EXCEPTION~n~tp", [Error]),
             error(ResStr, [], State),
             mzb_pipeline:error({benchmark_failed, Error},
                                fun (S) -> S#{result_str => ResStr} end)
@@ -389,7 +389,7 @@ handle_stage(finalize, sending_email_report, #{emails:= Emails} = State) ->
     case send_email_report(Emails, status(State)) of
         ok -> ok;
         {error, {Error, Stacktrace}} ->
-            error("Send report to ~p failed with reason: ~p~n~p", [Emails, Error, Stacktrace], State)
+            error("Send report to ~tp failed with reason: ~tp~n~tp", [Emails, Error, Stacktrace], State)
     end;
 
 handle_stage(finalize, cleaning_nodes, #{config:= #{deallocate_after_bench:= false}} = State) ->
@@ -415,9 +415,8 @@ handle_stage(finalize, deallocating_hosts, #{deallocator:= Deallocator} = State)
             info("Deallocator has started", [], State),
             Deallocator(),
             ok
-        catch _C:E ->
-            ST = erlang:get_stacktrace(),
-            error("Deallocation has failed with reason: ~p~nStacktrace: ~p", [E, ST], State),
+        catch _C:E:ST ->
+            error("Deallocation has failed with reason: ~tp~nStacktrace: ~tp", [E, ST], State),
             retry
         end
     end,
@@ -437,15 +436,15 @@ handle_call({request_report, Emails}, _, #{emails:= OldEmails} = State) ->
     {reply, ok, State#{emails:= OldEmails ++ Emails}};
 
 handle_call({change_env, Env}, From, #{status:= running, config:= Config, cluster_connection:= Connection} = State) ->
-    info("Change env req received: ~p~nOldEnv: ~p", [Env, maps:get(env, Config)], State),
+    info("Change env req received: ~tp~nOldEnv: ~tp", [Env, maps:get(env, Config)], State),
     Self = self(),
     director_async_call(Connection, {change_env, Env},
         fun ({result, Res}) ->
-                info("Received change_env response: ~p", [Res], State),
+                info("Received change_env response: ~tp", [Res], State),
                 ok == Res andalso mzb_pipeline:cast(Self, {env_changed, Env}),
                 mzb_pipeline:reply(From, Res);
             ({exception, {C, E, ST}}) ->
-                error("Change env exception ~p:~p~n~p", [C, E, ST], State),
+                error("Change env exception ~tp:~tp~n~tp", [C, E, ST], State),
                 mzb_pipeline:reply(From, {error, E})
         end),
     {noreply, State};
@@ -454,13 +453,13 @@ handle_call({change_env, _Env}, _From, #{} = State) ->
     {reply, {error, not_running}, State};
 
 handle_call({run_command, Pool, Percent, Command}, From, #{status:= running, cluster_connection:= Connection} = State) ->
-    info("Command run req received: ~p pool~p ~p%", [Command, Pool, Percent], State),
+    info("Command run req received: ~tp pool~tp ~tp%", [Command, Pool, Percent], State),
     director_async_call(Connection, {run_command, Pool, Percent, Command},
         fun ({result, Res}) ->
-                info("Received run_command response: ~p", [Res], State),
+                info("Received run_command response: ~tp", [Res], State),
                 mzb_pipeline:reply(From, Res);
             ({exception, {C, E, ST}}) ->
-                error("Run command exception ~p:~p~n~p", [C, E, ST], State),
+                error("Run command exception ~tp:~tp~n~tp", [C, E, ST], State),
                 mzb_pipeline:reply(From, {error, E})
         end),
     {noreply, State};
@@ -469,19 +468,19 @@ handle_call({run_command, _, _, _}, _From, #{} = State) ->
     {reply, {error, not_running}, State};
 
 handle_call({update_name, NewName}, _From, #{config:= Config} = State) ->
-    info("Update bench name: ~p", [NewName], State),
+    info("Update bench name: ~tp", [NewName], State),
     NewState = maps:put(config, maps:put(benchmark_name, NewName, Config), State),
     {reply, ok, NewState};
 
 handle_call({add_tags, Tags}, _From, #{config:= Config} = State) ->
-    info("Add tags: ~p / ~p", [Tags, mzb_bc:maps_get(tags, Config, [])], State),
+    info("Add tags: ~tp / ~tp", [Tags, mzb_bc:maps_get(tags, Config, [])], State),
     OldTags = mzb_bc:maps_get(tags, Config, []),
     NewTags = OldTags ++ [T || T <- Tags, not lists:member(T, OldTags)],
     NewState = maps:put(config, maps:put(tags, NewTags, Config), State),
     {reply, ok, NewState};
 
 handle_call({remove_tags, Tags}, _From, #{config:= Config} = State) ->
-    info("Remove tags: ~p", [Tags], State),
+    info("Remove tags: ~tp", [Tags], State),
     NewTags = mzb_bc:maps_get(tags, Config, []) -- Tags,
     NewState = maps:put(config, maps:put(tags, NewTags, Config), State),
     {reply, ok, NewState};
@@ -490,7 +489,7 @@ handle_call(get_author, _From, #{config:= Config} = State) ->
     {reply, maps:get(author, Config), State};
 
 handle_call(_Request, _From, State) ->
-    error("Unhandled call: ~p", [_Request], State),
+    error("Unhandled call: ~tp", [_Request], State),
     {noreply, State}.
 
 handle_cast({director_message, {new_metrics, NewMetrics}}, #{metrics:= Metrics, config:= Config} = State) ->
@@ -503,7 +502,7 @@ handle_cast({director_message, {new_metrics, NewMetrics}}, #{metrics:= Metrics, 
     {noreply, maybe_update_bench(State#{metrics => NewMetrics})};
 
 handle_cast({director_message, Unknown}, State) ->
-    lager:error("Unknown director message ~p", [Unknown]),
+    logger:error("Unknown director message ~tp", [Unknown]),
     {noreply, State};
 
 handle_cast({env_changed, NewEnv}, State = #{config:= Config}) ->
@@ -525,18 +524,18 @@ handle_cast({error_counter, inc_system}, #{system_errors:= OldValue} = State) ->
     {noreply, maybe_update_bench(State#{system_errors => OldValue + 1})};
 
 handle_cast(_Msg, State) ->
-    error("Unhandled cast: ~p", [_Msg], State),
+    error("Unhandled cast: ~tp", [_Msg], State),
     {noreply, State}.
 
 handle_info({'EXIT', _, normal}, State) ->
     {noreply, State};
 
 handle_info({'EXIT', P, Reason}, State) ->
-    error("Benchmark received 'EXIT' from ~p with reason ~p, stopping", [P, Reason], State),
+    error("Benchmark received 'EXIT' from ~tp with reason ~tp, stopping", [P, Reason], State),
     {stop, Reason, State};
 
 handle_info(_Info, State) ->
-    error("Unhandled info: ~p", [_Info], State),
+    error("Unhandled info: ~tp", [_Info], State),
     {noreply, State}.
 
 
@@ -545,14 +544,14 @@ terminate(normal, State) ->
     catch (maps:get(log_user_file_handler, State))(close);
 % something is going wrong there. use special status for bench and run finalize stages again
 terminate(Reason, #{id:= Id} = State) ->
-    error("Receive terminate while finalize is not completed: ~p", [Reason], State),
+    error("Receive terminate while finalize is not completed: ~tp", [Reason], State),
     mzb_api_server:bench_finished(Id, status(State)),
     catch (maps:get(log_file_handler, State))(close),
     catch (maps:get(log_user_file_handler, State))(close),
     spawn(
         fun() ->
             try
-                lager:info("Starting finalizing process for #~p", [Id]),
+                logger:info("Starting finalizing process for #~tp", [Id]),
                 {ok, Timer} = timer:kill_after(5 * 60 * 1000),
                 Stages = proplists:get_value(finalize, workflow_config(State), []),
                 NewState = handle_pipeline_status({final, failed}, State),
@@ -562,17 +561,15 @@ terminate(Reason, #{id:= Id} = State) ->
                                     Res = handle_stage(finalize, Stage, NewState),
                                     Res
                                 catch
-                                    _C:E ->
-                                        ST = erlang:get_stacktrace(),
-                                        error("Stage 'finalize - ~s': failed~n~s", [Stage, format_error(Stage, {E, ST})], NewState)
+                                    _C:E:ST ->
+                                        error("Stage 'finalize - ~ts': failed~n~ts", [Stage, format_error(Stage, {E, ST})], NewState)
                                 end
                             end, Stages),
 
                 timer:cancel(Timer)
             catch
-                Class:Error ->
-                    Stacktrace= erlang:get_stacktrace(),
-                    lager:error("Finalizing process for #~p has crashed with reason: ~p~n~p", [Id, Error, Stacktrace]),
+                Class:Error:Stacktrace ->
+                    logger:error("Finalizing process for #~tp has crashed with reason: ~tp~n~tp", [Id, Error, Stacktrace]),
                     erlang:raise(Class, Error, Stacktrace)
             end
         end),
@@ -591,25 +588,25 @@ maybe_update_bench(State = #{previous_status:= OldStatus}) ->
     end.
 
 handle_pipeline_status_ll({start, Phase, Stage}, State) ->
-    info("Stage '~s - ~s': started", [Phase, Stage], State),
+    info("Stage '~ts - ~ts': started", [Phase, Stage], State),
     case Phase of
         pipeline -> State#{status => Stage};
         _ -> State
     end;
 handle_pipeline_status_ll({complete, Phase, Stage}, State) ->
-    info("Stage '~s - ~s': finished", [Phase, Stage], State),
+    info("Stage '~ts - ~ts': finished", [Phase, Stage], State),
     State;
 handle_pipeline_status_ll({exception, Phase, Stage, E, ST}, #{result_str:= ResStr} = State) ->
-    error("Stage '~s - ~s': failed~n~s", [Phase, Stage, format_error(Stage, {E, ST})], State),
+    error("Stage '~ts - ~ts': failed~n~ts", [Phase, Stage, format_error(Stage, {E, ST})], State),
     case ResStr of
         "" ->
-            Res = mzb_string:format("Stage ~p failed: ~p", [Stage, E]),
+            Res = mzb_string:format("Stage ~tp failed: ~tp", [Stage, E]),
             State#{result_str => Res};
         _ ->
             State
     end;
 handle_pipeline_status_ll({final, Final}, State) ->
-    info("Bench final: ~s", [Final], State),
+    info("Bench final: ~ts", [Final], State),
     State#{status => Final, finish_time => seconds()}.
 
 %%%===================================================================
@@ -628,12 +625,12 @@ extract_node_install_spec(Params) ->
         case Get(mzbench_git) of
             undefined -> ok;
             _ ->
-                 lager:error("mzbench_git param is obsolete, use node_git instead"),
+                 logger:error("mzbench_git param is obsolete, use node_git instead"),
                  erlang:error(mzbench_git_is_obsolete_use_node_git)
         end,
         case Get(mzbench_rsync) of
             undefined -> ok;
-            _ -> lager:error("mzbench_rsync param is obsolete, use node_rsync instead"),
+            _ -> logger:error("mzbench_rsync param is obsolete, use node_rsync instead"),
                  erlang:error(mzbench_rsync_is_obsolete_use_node_rsync)
         end,
     % END OF BC CODE
@@ -667,7 +664,7 @@ send_email_report(Emails, #{id:= Id,
         MetricNames = mzb_api_metrics:extract_metric_names(Metrics),
         MetricFilenames = [metrics_file(N, Config) || N <- MetricNames],
         {Subj, Body} = generate_mail_body(Id, Status, Config),
-        lager:info("EMail report: ~n~s~n~s~n", [Subj, Body]),
+        logger:info("EMail report: ~n~ts~n~ts~n", [Subj, Body]),
         Attachments = lists:map(
             fun (F) ->
                 {ok, Bin} = file:read_file(local_path(F, Config)),
@@ -676,14 +673,14 @@ send_email_report(Emails, #{id:= Id,
             end, MetricFilenames),
         lists:foreach(
             fun (Addr) ->
-                lager:info("Sending bench results to ~s", [Addr]),
-                BAddr = list_to_binary(Addr),
+                logger:info("Sending bench results to ~ts", [Addr]),
+                BAddr = iolist_to_binary(Addr),
                 mzb_api_mail:send(BAddr, Subj, Body, Attachments, application:get_env(mzbench_api, mail, []))
             end, Emails),
         ok
     catch
-        _:Error ->
-            {error, {Error, erlang:get_stacktrace()}}
+        _:Error:Stacktrace ->
+            {error, {Error, Stacktrace}}
     end;
 send_email_report(_Emails, Status) ->
     {error, {badarg, Status}}.
@@ -704,7 +701,7 @@ generate_bench_env(Id, Params) ->
                             _ -> E
                         end
                        end, Env,
-                [{"mzb_script_name", list_to_binary(ScriptName)}, {"mzb_bench_id", Id}]).
+                [{"mzb_script_name", iolist_to_binary(ScriptName)}, {"mzb_bench_id", Id}]).
 
 script_path(Script) ->
     case Script of
@@ -727,12 +724,12 @@ run_periodically(StartTime, MaxTime, RetryTimeoutSec, Fn) ->
             end
     end.
 
-allocate_hosts(#{nodes_arg:= N, cloud:= Cloud} = Config, Logger) when is_integer(N), N > 0 ->
+allocate_hosts(#{nodes_arg:= N, cloud:= Cloud} = Config, _Logger) when is_integer(N), N > 0 ->
     #{id:= BenchId,
       purpose:= Purpose,
       initial_user:= User,
       env:= Env} = Config,
-    Description = mzb_string:format("MZBench cluster:~n~p", [Config]),
+    Description = mzb_string:format("MZBench cluster:~n~tp", [Config]),
     DefaultClusterConfig = #{
         purpose => Purpose,
         user => User,
@@ -746,7 +743,7 @@ allocate_hosts(#{nodes_arg:= N, cloud:= Cloud} = Config, Logger) when is_integer
             DefaultClusterConfig
     end,
     % Allocate one supplementary node for the director
-    Logger(info, "Allocating ~p hosts in ~p cloud...", [N + 1, Cloud]),
+    logger:info( "Allocating ~tp hosts in ~tp cloud...", [N + 1, Cloud]),
     {ok, ClusterId, UserName, Hosts} = mzb_api_cloud:create_cluster(BenchId, Cloud, N + 1, ClusterConfig),
     Deallocator =
         fun () ->
@@ -817,26 +814,26 @@ init_data_dir(Config) ->
 generate_mail_body(Id, Status, Config) ->
     #{env:= Env, script:= Script} = Config,
     #{name := ScriptName, body := ScriptBody} = Script,
-    Subject = io_lib:format("Bench report for ~s (~s)", [ScriptName, Status]),
-    Chars = io_lib:format(
-        "Status: ~s~n~n"
-        "Environment:~n~s~n~n"
-        "Script body:~n~s~n~n"
-        "Benchmark logs:~n  ~s~n~n"
-        "Metrics data:~n  ~s~n~n",
+    Subject = mzb_string:format("Bench report for ~ts (~ts)", [ScriptName, Status]),
+    Chars = mzb_string:format(
+        "Status: ~ts~n~n"
+        "Environment:~n~ts~n~n"
+        "Script body:~n~ts~n~n"
+        "Benchmark logs:~n  ~ts~n~n"
+        "Metrics data:~n  ~ts~n~n",
         [Status,
-         indent(string:join([io_lib:format("~p = ~p", [K,V]) || {K,V} <- Env], "\n"), 2, "(no env variables)"),
+         indent(string:join([mzb_string:format("~tp = ~tp", [K,V]) || {K,V} <- Env], "\n"), 2, "(no env variables)"),
          indent(ScriptBody, 2),
          bench_log_link(Id, Config),
          bench_data_link(Id, Config)
          ]),
-    {list_to_binary(Subject), list_to_binary(Chars)}.
+    {list_to_binary(Subject), iolist_to_binary(Chars)}.
 
 bench_data_link(Id, #{req_host:= ServerAddr}) ->
-    io_lib:format("http://~s/data?id=~b", [ServerAddr, Id]).
+    mzb_string:format("http://~ts/data?id=~b", [ServerAddr, Id]).
 
 bench_log_link(Id, #{req_host:= ServerAddr}) ->
-    io_lib:format("http://~s/logs?id=~b", [ServerAddr, Id]).
+    mzb_string:format("http://~ts/logs?id=~b", [ServerAddr, Id]).
 
 indent("", N, Default) -> indent(Default, N);
 indent(Str, N, _) -> indent(Str, N).
@@ -865,13 +862,13 @@ format_log(_Handler, debug, _Format, _Args) -> ok;
 format_log(Handler, Severity, Format, Args) ->
     Now = {_, _, Ms} = os:timestamp(),
     {_, {H,M,S}} = calendar:now_to_universal_time(Now),
-    _ = Handler({write, io_lib:format("~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0B [~s] [ API ] ~p " ++ Format ++ "~n", [H, M, S, Ms div 1000, Severity, self()|Args])}),
+    _ = Handler({write, mzb_string:format("~2.10.0B:~2.10.0B:~2.10.0B.~3.10.0B [~ts] [ API ] ~tp " ++ Format ++ "~n", [H, M, S, Ms div 1000, Severity, self()|Args])}),
     ok.
 
 format_error(_, {{cmd_failed, Cmd, Code, Output}, _}) ->
-    io_lib:format("Command returned ~b:~n ~s~nCommand output: ~s", [Code, Cmd, Output]);
+    mzb_string:format("Command returned ~b:~n ~ts~nCommand output: ~ts", [Code, Cmd, Output]);
 format_error(Op, {E, Stack}) ->
-    io_lib:format("Benchmark has failed on ~p with reason:~n~p~n~nStacktrace: ~p", [Op, E, Stack]).
+    mzb_string:format("Benchmark has failed on ~tp with reason:~n~tp~n~nStacktrace: ~tp", [Op, E, Stack]).
 
 get_env(K) -> application:get_env(mzbench_api, K, undefined).
 
@@ -880,7 +877,7 @@ generate_script_filename(#{name := _Name, body := Body} = Script) ->
         fun(Num) -> erlang:integer_to_list(Num, 16) end,
         erlang:binary_to_list(crypto:hash(sha, Body))
     )),
-    Script#{filename => mzb_string:format("~s.erl", [Name])}.
+    Script#{filename => mzb_string:format("~ts.erl", [Name])}.
 
 get_file_writer(Filename, none) ->
     {ok, H} = file:open(Filename, [write]),
@@ -1014,7 +1011,7 @@ handle_management_msg({error, _}, _, S = #{handlers:= Handlers}) ->
     {ok, S#{handlers => #{}}}.
 
 report_metrics(Name, Timestamp, Value, #{config:= Config, handlers:= Handlers} = S) ->
-    ToWrite = io_lib:format("~B\t~p~n", [Timestamp, Value]),
+    ToWrite = mzb_string:format("~B\t~tp~n", [Timestamp, Value]),
     case maps:find(Name, Handlers) of
         {ok, H} -> {H({write, ToWrite}), S};
         error ->
@@ -1034,8 +1031,8 @@ aggregate_results(Metrics, Histograms, #{config:= Config} = State) ->
             try
                 aggregate_results_for_metric(M, Config, Percentiles, Histograms)
             catch
-                _:Error ->
-                    error("Aggregating result for ~p failed: ~p~nStacktrace: ~p", [M, Error, erlang:get_stacktrace()], State),
+                _:Error:Stacktrace ->
+                    error("Aggregating result for ~tp failed: ~tp~nStacktrace: ~tp", [M, Error, Stacktrace], State),
                     []
             end
         end, Flatten),

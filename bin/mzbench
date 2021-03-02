@@ -58,6 +58,8 @@ if server_functions:
     doc_acc += """
   mzbench clean
   mzbench start_server [--config=<config>]
+  mzbench debug_server [--config=<config>]
+  mzbench remsh_server
   mzbench stop_server
   mzbench restart_server [--config=<config>]
   mzbench run_local <script> [--env=<name=value>...]
@@ -226,12 +228,15 @@ def clean():
 def is_server_started():
     with util.silent_stdout():
         try:
-            return util.check_output([server_rel_dir + "bin/mzbench_api","rpcterms", "mzb_api_server", "ensure_started"]).strip() == "ok"
+            return util.check_output([server_rel_dir + "bin/mzbench_api","rpc", "mzb_api_server", "ensure_started"]).strip() == "ok"
         except subprocess.CalledProcessError:
             return False
 
 def print_server_config():
-    print(util.check_output([server_rel_dir + "bin/mzbench_api","rpcterms", "mzb_api_server", "config_info"]))
+    print("Config:\n")
+    my_env = os.environ.copy()
+    my_env['USE_NODETOOL'] = 'true'
+    print(util.check_output([server_rel_dir + "bin/mzbench_api","rpc", "mzb_api_server", "config_info"], env=my_env))
 
 def ensure_server_started(attempts):
     if attempts <= 0:
@@ -248,6 +253,29 @@ def ensure_server_started(attempts):
 #=================================================================================================
 # API server startup and stop
 #=================================================================================================
+def remsh_server():
+    start_environ = os.environ
+    subprocess.check_call([server_rel_dir + 'bin/mzbench_api', 'remote_console'], env=start_environ)
+
+def debug_server(config):
+
+    if server_autorebuild:
+        require('escript')
+        execute_make(SERVER_PROJECTS, 'generate')
+    try:
+        start_environ = os.environ
+        start_environ['CODE_LOADING_MODE'] = 'interactive'
+        if 'ORIG_PATH' not in start_environ:
+            start_environ['ORIG_PATH'] = start_environ['PATH']
+        if config is not None:
+            start_environ['MZBENCH_CONFIG_FILE'] = os.path.abspath(config)
+        subprocess.check_call(['rm', '-rf', server_rel_dir + '../../../../log'])
+        subprocess.check_call([server_rel_dir + 'bin/mzbench_api', 'console'], env=start_environ)
+    except subprocess.CalledProcessError as e:
+        print("Failed to execute server debug command")
+        sys.exit(e.returncode)
+
+
 def start_server(config):
 
     if server_autorebuild:
@@ -266,7 +294,7 @@ def start_server(config):
             start_environ['ORIG_PATH'] = start_environ['PATH']
         if config is not None:
             start_environ['MZBENCH_CONFIG_FILE'] = os.path.abspath(config)
-        subprocess.check_call([server_rel_dir + 'bin/mzbench_api', 'start'], env=start_environ)
+        subprocess.check_call([server_rel_dir + 'bin/mzbench_api', 'daemon'], env=start_environ)
     except subprocess.CalledProcessError as e:
         print("Failed to execute server start command")
         sys.exit(e.returncode)

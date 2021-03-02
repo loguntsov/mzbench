@@ -148,7 +148,7 @@ quotes_test() ->
     "defaults(\"var1\" = \"var1_default_value\",\n"
     "         \"var3\" = \"\\n,\\\\,\\\\\\\\\",\n"
     "         \"var2\" = \"the answer is \\\"yes\\\"\")"),
-    io:format("~p", [Res]),
+    io:format("~tp", [Res]),
     ?assertMatch([#operation{name = defaults, args = [[{"var1", "var1_default_value"},
                                             {"var3", "\n,\\,\\\\"},
                                             {"var2", "the answer is \"yes\""}]]}], Res).

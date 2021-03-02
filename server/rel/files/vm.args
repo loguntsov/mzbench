@@ -1,6 +1,8 @@
 ## Name of the node
 -sname mzbench_api
 
++pc unicode
+
 ## Cookie for distributed erlang
 -setcookie mzbench_api
 

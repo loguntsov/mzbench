@@ -58,15 +58,15 @@ handle_call({release, BenchId, Exclusive}, _From, #s{locks = Locks, queue = Queu
     {reply, ok, State#s{locks = NewLocks2, queue = lists:reverse(NewQueue2)}};
 
 handle_call(Req, _From, State) ->
-    lager:error("Unhandled call: ~p", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 handle_cast(Msg, State) ->
-    lager:error("Unhandled cast: ~p", [Msg]),
+    logger:error("Unhandled cast: ~tp", [Msg]),
     {stop, {unhandled_cast, Msg}, State}.
 
 handle_info(Info, State) ->
-    lager:error("Unhandled info: ~p", [Info]),
+    logger:error("Unhandled info: ~tp", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

@@ -34,7 +34,7 @@ init([Host, Port, Role]) ->
     {ok, #s{}}.
 
 dispatch({init, NodeName, Role}, #s{socket = Socket, init_timer = Timer} = State) ->
-    system_log:info("Received init from ~p ~p", [Role, NodeName]),
+    logger:info("Received init from ~tp ~tp", [Role, NodeName]),
     case mzb_interconnect:accept_connection(NodeName, Role, self(), fun (Term) -> send(Socket, Term) end) of
         {ok, _} ->
             erlang:cancel_timer(Timer),
@@ -52,14 +52,14 @@ handle_call(_Request, _From, State) ->
    {noreply, State}.
 
 handle_cast({connect, Host, Port, Role}, State) ->
-    system_log:info("Connecting to node at ~p:~p", [Host, Port]),
+    logger:info("Connecting to node at ~tp:~tp", [Host, Port]),
     case gen_tcp:connect(Host, Port, [{packet, 4}, {active, once}, binary], ?CONNECT_TIMEOUT_MSEC) of
         {ok, Socket} ->
-            system_log:info("Connected to node at ~p:~p", [Host, Port]),
+            logger:info("Connected to node at ~tp:~tp", [Host, Port]),
             send(Socket, {init, node(), Role}),
             {noreply, State#s{socket = Socket, init_timer = erlang:send_after(?INIT_WAIT_MSEC, self(), init_timer_expired)}};
         {error, Reason} ->
-            system_log:error("Could not connect to node at ~p:~p with reason: ~p", [Host, Port, Reason]),
+            logger:error("Could not connect to node at ~tp:~tp with reason: ~tp", [Host, Port, Reason]),
             timer:sleep(?RECONNECT_TIMEOUT_MSEC),
             {stop, {connect_failed, Host, Port, Reason}, State}
     end;
@@ -75,7 +75,7 @@ handle_info({tcp_closed, Socket}, #s{socket = Socket} = State) ->
     {stop, normal, State};
 
 handle_info({tcp_error, Socket, Reason}, #s{socket = Socket} = State) ->
-    system_log:error("Socket closed with reason: ~p", [Reason]),
+    logger:error("Socket closed with reason: ~tp", [Reason]),
     {stop, {socket_error, Reason}, State};
 
 handle_info(init_timer_expired, #s{socket = Socket} = State) ->

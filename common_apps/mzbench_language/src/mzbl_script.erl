@@ -55,14 +55,12 @@ read_from_string(String) ->
     try
         mzbl_literals:convert(parse(String))
     catch
-        C:{parse_error, {_, _, ErrorInfo}} = E ->
-            ST = erlang:get_stacktrace(),
-            lager:error("Parsing script file failed: ~s", [erl_parse:format_error(ErrorInfo)]),
+        C:{parse_error, {_, _, ErrorInfo}} = E:ST ->
+            lager:error("Parsing script file failed: ~ts", [erl_parse:format_error(ErrorInfo)]),
             erlang:raise(C,E,ST);
-        C:E ->
-            ST = erlang:get_stacktrace(),
+        C:E:ST ->
             lager:error(
-                "Failed to read script '~p' 'cause of ~p~nStacktrace: ~s",
+                "Failed to read script '~tp' 'cause of ~tp~nStacktrace: ~ts",
                 [String, E, pretty_errors:stacktrace(ST)]),
             erlang:raise(C,E,ST)
     end.
@@ -72,10 +70,9 @@ read(Path) ->
     try
         read_from_string(read_file(Path))
     catch
-        C:E ->
-            ST = erlang:get_stacktrace(),
+        C:E:ST ->
             lager:error(
-                "Failed to read script: ~p 'cause of ~p~nStacktrace: ~s",
+                "Failed to read script: ~tp 'cause of ~tp~nStacktrace: ~ts",
                 [Path, E, pretty_errors:stacktrace(ST)]),
             erlang:raise(C,E,ST)
     end.
@@ -134,7 +131,7 @@ token_and_indents(LineNumber, L, N) ->
         true -> {A, B} = lists:splitwith(fun (E) -> E > N end, L),
                 {lists:flatten(["_DEDENT_ " || _X <- A]), B};
         false -> erlang:error({parse_error,
-            lists:flatten(io_lib:format("Wrong indentation on Line ~p", [LineNumber]))})
+            lists:flatten(io_lib:format("Wrong indentation on Line ~tp", [LineNumber]))})
     end.
 
 -spec get_indent(integer(), [char()]) -> integer().
@@ -210,7 +207,7 @@ import_resource(Env, File, Type) ->
                         case lists:append([mzb_file:wildcard(M) || M <- Masks])  of
                             [] -> erlang:error(enoent);
                             [Path|_] ->
-                                lager:error("Trying ~p...", [Path]),
+                                lager:error("Trying ~tp...", [Path]),
                                 case file:read_file(Path) of
                                     {ok, D} -> D;
                                     {error, R} -> erlang:error(R)
@@ -221,7 +218,7 @@ import_resource(Env, File, Type) ->
         convert(Content, Type)
     catch
         _:Reason ->
-            lager:error("Resource ~p(~p) import error: ~p", [File, Type, Reason]),
+            lager:error("Resource ~tp(~tp) import error: ~tp", [File, Type, Reason]),
             erlang:error({import_resource_error, File, Type, Reason})
     end.
 
@@ -367,5 +364,5 @@ normalize_env_(V) when is_binary(V) -> erlang:binary_to_list(V);
 normalize_env_(V) when is_list(V) -> V;
 normalize_env_(V) when is_number(V) -> V;
 normalize_env_(U) ->
-    Msg = mzb_string:format("Env value of unknown type: ~p", [U]),
+    Msg = mzb_string:format("Env value of unknown type: ~tp", [U]),
     erlang:error({error, {validation, [Msg]}}).

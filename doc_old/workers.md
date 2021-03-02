@@ -115,7 +115,7 @@ metrics() -> [{group, "Application Metrics", [
 -spec print(state(), meta(), string()) -> {nil, state()}.
 print(State, Meta, Text) ->
     mzb_metrics:notify({"dummy_counter", counter}, 1),
-    lager:info("Printing ~p, Meta: ~p~n", [Text, Meta]),
+    lager:info("Printing ~tp, Meta: ~tp~n", [Text, Meta]),
     {nil, State}.
 ```
 

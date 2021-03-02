@@ -12,7 +12,7 @@ main([BenchDir]) ->
                     Compressed = zlib:compress(B),
                     ok = file:write_file(LogFile, Compressed),
                     NewConfig = Config#{log_compression => deflate, metrics_compression => none},
-                    NewStatusContent = io_lib:format("~p.", [Status#{config => NewConfig}]),
+                    NewStatusContent = io_lib:format("~tp.", [Status#{config => NewConfig}]),
                     ok = file:write_file(StatusFile, NewStatusContent)
             end;
         {{error, enoent}, _} -> ok;
