@@ -3,11 +3,11 @@ SECOND_ARG := $(wordlist 2,2,$(MAKECMDGOALS))
 
 .SILENT: new-worker
 
-REBAR := $(abspath $(shell which ../bin/rebar3 || which rebar3))
+REBAR := ./rebar3
 SERVICE_PREFIX=/mz
 SERVICE_NAME=mzbench
 SERVICE_LOG_DIR=/var/log/${SERVICE_NAME}
-GIT_HEAD := $(shell git rev-parse HEAD)
+GIT_HEAD :=
 OS_VERSION := $(shell uname -sr | awk '{gsub(/ /, "-"); print tolower($$0)}')
 RELEASE_BINARY := _build/default/rel/$(SERVICE_NAME)/bin/$(SERVICE_NAME)
 
@@ -65,17 +65,22 @@ clean:
 	rm -rf .make
 	rm -rf *.tgz
 	rm -rf pkgroot
+	rm -f rebar.lock
+	rm -rf prepared_sources
 
 DIALYZABLE_EBINS := apps/*/ebin
 -include ../lib/dialyzer.mk
 
 $(RELEASE_BINARY): .make/compilation-up-to-date rel/files/sys.config rel/files/vm.args
 	$(REBAR) release
+	find . -xtype l 2>/dev/null -exec rm {} \;
 	touch $(RELEASE_BINARY)
 
 .make/compilation-up-to-date: rebar.config $(SOURCES) .make/git-rev-$(GIT_HEAD) $(MZBENCH_COMMON_SOURCES)
+	pwd
 	$(REBAR) compile
 	make -C _build/default/deps/jiffy
+	find . -xtype l 2>/dev/null -exec rm {} \;
 	mkdir -p .make && touch $@
 
 .make/git-rev-$(GIT_HEAD):

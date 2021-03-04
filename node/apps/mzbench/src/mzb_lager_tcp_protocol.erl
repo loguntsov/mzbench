@@ -1,36 +1,27 @@
 -module(mzb_lager_tcp_protocol).
 
 -behaviour(ranch_protocol).
+-export([
+    start_link/3,
+    init/3
+]).
+
 -behaviour(gen_server).
-
-%% API
--export([start_link/4]).
-
-%% gen_server
 -export([init/1,
-         init/4,
          handle_call/3,
          handle_cast/2,
          handle_info/2,
          terminate/2,
-         code_change/3]).
+         code_change/3
+]).
 
 -record(state, {socket, transport}).
 
-start_link(Ref, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, init, [Ref, Socket, Transport, Opts]).
+start_link(Ref, Transport, Opts) ->
+    proc_lib:start_link(?MODULE, init, [Ref, Transport, Opts]).
 
-dispatch(close_req, #state{socket = Socket, transport = Transport} = State) ->
-    Transport:close(Socket),
-    {stop, normal, State};
-
-dispatch(Unhandled, State) ->
-    logger:error("Unhandled tcp message: ~tp", [Unhandled]),
-    {noreply, State}.
-
-init([State]) -> {ok, State}.
-
-init(Ref, Socket, Transport, Opts) ->
+init(Ref, Transport, Opts) ->
+    {ok, Socket} = ranch:handshake(Ref),
     ok = proc_lib:init_ack({ok, self()}),
     ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}, {packet, 4}, {keepalive, true}, binary]),
@@ -48,6 +39,10 @@ init(Ref, Socket, Transport, Opts) ->
     end,
     lager:set_loglevel(mzb_lager_tcp, Socket, info),
     gen_server:enter_loop(?MODULE, [], #state{socket=Socket, transport=Transport}).
+
+%%  GEN_SERVER
+
+init([State]) -> {ok, State}.
 
 handle_info({tcp_closed, _Socket}, State) ->
     {stop, normal, State};
@@ -82,3 +77,12 @@ terminate(_Reason, #state{socket = Socket}) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+%% INTERNAL
+
+dispatch(close_req, #state{socket = Socket, transport = Transport} = State) ->
+    Transport:close(Socket),
+    {stop, normal, State};
+
+dispatch(Unhandled, State) ->
+    logger:error("Unhandled tcp message: ~tp", [Unhandled]),
+    {noreply, State}.

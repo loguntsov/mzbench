@@ -822,12 +822,12 @@ generate_mail_body(Id, Status, Config) ->
         "Benchmark logs:~n  ~ts~n~n"
         "Metrics data:~n  ~ts~n~n",
         [Status,
-         indent(string:join([mzb_string:format("~tp = ~tp", [K,V]) || {K,V} <- Env], "\n"), 2, "(no env variables)"),
-         indent(ScriptBody, 2),
+         mzb_string:indent(mzb_string:join([mzb_string:format("~tp = ~tp", [K,V]) || {K,V} <- Env], "\n"), 2, "(no env variables)"),
+         mzb_string:indent(ScriptBody, 2),
          bench_log_link(Id, Config),
          bench_data_link(Id, Config)
          ]),
-    {list_to_binary(Subject), iolist_to_binary(Chars)}.
+    {Subject, iolist_to_binary(Chars)}.
 
 bench_data_link(Id, #{req_host:= ServerAddr}) ->
     mzb_string:format("http://~ts/data?id=~b", [ServerAddr, Id]).
@@ -835,14 +835,7 @@ bench_data_link(Id, #{req_host:= ServerAddr}) ->
 bench_log_link(Id, #{req_host:= ServerAddr}) ->
     mzb_string:format("http://~ts/logs?id=~b", [ServerAddr, Id]).
 
-indent("", N, Default) -> indent(Default, N);
-indent(Str, N, _) -> indent(Str, N).
 
-indent(Binary, N) when is_binary(Binary) ->
-    erlang:list_to_binary(indent(erlang:binary_to_list(Binary), N));
-indent(Str, N) ->
-    Spaces = [$\s || _ <- lists:seq(1, N)],
-    string:join([Spaces ++ Line || Line <- string:tokens(Str, "\n")], "\n").
 
 info(Format, Args, State) ->
     log(info, Format, Args, State).
@@ -887,7 +880,7 @@ get_file_writer(Filename, none) ->
             ok
     end;
 get_file_writer(Filename, deflate) ->
-    P = erlang:spawn_link(fun () -> deflate_process(Filename) end),
+    P = proc_lib:spawn_link(fun () -> deflate_process(Filename) end),
     fun (close) ->
             Ref = erlang:monitor(process, P),
             P ! close,

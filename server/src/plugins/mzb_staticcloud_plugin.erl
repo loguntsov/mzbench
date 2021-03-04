@@ -1,14 +1,13 @@
 -module(mzb_staticcloud_plugin).
 
--behaviour(gen_server).
-
+-behaviour(mzb_api_cloud).
 -export([
     start/2,
     create_cluster/3,
     destroy_cluster/1
 ]).
 
-%% gen_server callbacks
+-behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -39,7 +38,7 @@ destroy_cluster({Pid, Hosts}) ->
 %%%===================================================================
 
 init([Opts]) ->
-    Hosts = mzb_bc:maps_get(hosts, Opts, ["localhost"]),
+    Hosts = mzb_bc:maps_get(hosts, Opts, [<<"localhost">>]),
     {Hostnames, Username} = parse_hosts(Hosts),
     {ok, #{hosts => Hostnames, user_name => Username, hosts_locked => []}}.
 

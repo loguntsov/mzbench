@@ -1,14 +1,14 @@
 -module(mzb_interconnect_server).
 
 -behaviour(ranch_protocol).
--behaviour(gen_server).
-
-%% API
--export([start_link/4]).
+-export([
+    start_link/3,
+    init/3
+]).
 
 %% gen_server
+-behaviour(gen_server).
 -export([init/1,
-         init/4,
          handle_call/3,
          handle_cast/2,
          handle_info/2,
@@ -23,35 +23,20 @@
 
 -define(INIT_WAIT_MSEC, 5000).
 
-start_link(Ref, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, init, [Ref, Socket, Transport, Opts]).
+start_link(Ref, Transport, Opts) ->
+    proc_lib:start_link(?MODULE, init, [Ref, Transport, Opts]).
 
-
-init([State]) -> {ok, State}.
-
-init(Ref, Socket, Transport, _Opts) ->
+init(Ref, Transport, _Opts) ->
+    {ok, Socket} = ranch:handshake(Ref),
     ok = proc_lib:init_ack({ok, self()}),
     ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}, {packet, 4}, {keepalive, true}, binary]),
     Timer = erlang:send_after(?INIT_WAIT_MSEC, self(), init_timer_expired),
     gen_server:enter_loop(?MODULE, [], #state{socket=Socket, transport=Transport, init_timer = Timer}).
 
-dispatch({init, NodeName, Role}, #state{socket = Socket, transport = Transport, init_timer = Timer} = State) ->
-    logger:info("Received init from ~tp ~tp", [Role, NodeName]),
-    Sender = fun (Msg) -> send(Transport, Socket, Msg) end,
-    case mzb_interconnect:accept_connection(NodeName, Role, self(), Sender) of
-        {ok, MyRole} ->
-            erlang:cancel_timer(Timer),
-            send(Transport, Socket, {init, node(), MyRole}),
-            {noreply, State#state{init_timer = undefined}};
-        {error, _} ->
-            Transport:close(Socket),
-            {stop, normal, State}
-    end;
+%% GEN_SERVER
 
-dispatch(Msg, State) ->
-    mzb_interconnect:handle(Msg),
-    {noreply, State}.
+init([State]) -> {ok, State}.
 
 handle_info(init_timer_expired, #state{socket = Socket, transport = Transport} = State) ->
     Transport:close(Socket),
@@ -89,5 +74,25 @@ terminate(_Reason, #state{} = _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+%% INTERNAL
+
+dispatch({init, NodeName, Role}, #state{socket = Socket, transport = Transport, init_timer = Timer} = State) ->
+    logger:info("Received init from ~tp ~tp", [Role, NodeName]),
+    Sender = fun (Msg) -> send(Transport, Socket, Msg) end,
+    case mzb_interconnect:accept_connection(NodeName, Role, self(), Sender) of
+        {ok, MyRole} ->
+            erlang:cancel_timer(Timer),
+            send(Transport, Socket, {init, node(), MyRole}),
+            {noreply, State#state{init_timer = undefined}};
+        {error, _} ->
+            Transport:close(Socket),
+            {stop, normal, State}
+    end;
+
+dispatch(Msg, State) ->
+    mzb_interconnect:handle(Msg),
+    {noreply, State}.
+
 send(Transport, Socket, Msg) ->
     Transport:send(Socket, erlang:term_to_binary(Msg)).
+

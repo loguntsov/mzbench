@@ -323,5 +323,5 @@ k_times_iter(Expr, Provider, I, Env, Step, S, Iter, N) ->
 
 k_times_spawn(_, _, _, _, _, S, _, 0) -> S;
 k_times_spawn(Expr, Provider, I, Env, Step, S, Iter, N) ->
-    spawn_link(fun() -> mzbl_interpreter:eval(Expr, S, [{I, Iter}|Env], Provider) end),
+    proc_lib:spawn_link(fun() -> mzbl_interpreter:eval(Expr, S, [{I, Iter}|Env], Provider) end),
     k_times_iter(Expr, Provider, I, Env, Step, S, Iter + Step, N-1).

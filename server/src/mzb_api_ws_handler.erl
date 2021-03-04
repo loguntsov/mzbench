@@ -114,7 +114,7 @@ websocket_handle({text, Msg}, State) ->
     %% logger:info("WS REQUEST: ~tp", [ Msg ]),
     case dispatch_request(jiffy:decode(Msg, [return_maps]), State) of
         {reply, Reply, NewState = #state{}} ->
-            logger:info("Reply ~p", [ Reply ]),
+            % logger:info("Reply ~p", [ Reply ]),
             JsonReply = iolist_to_binary(jiffy:encode(mzb_string:str_to_bstr(Reply), [force_utf8])),
             %% logger:info("WS RESPONSE: ~tp", [ JsonReply ]),
             {reply, {text, JsonReply}, NewState};
@@ -346,7 +346,7 @@ dispatch_request(#{<<"cmd">> := <<"unsubscribe_benchset">>} = Cmd, State = #stat
     end;
 
 dispatch_request(#{<<"cmd">> := <<"get_timeline">>} = Cmd, State = #state{}) ->
-    logger:info("Get timeline start"),
+    % logger:info("Get timeline start"),
     Limit = mzb_bc:maps_get(<<"limit">>, Cmd, 10),
     MaxId = mzb_bc:maps_get(<<"max_id">>, Cmd, undefined),
     MinId = mzb_bc:maps_get(<<"min_id">>, Cmd, undefined),
@@ -371,7 +371,7 @@ dispatch_request(#{<<"cmd">> := <<"get_timeline">>} = Cmd, State = #state{}) ->
 
     TimelineIds = [Id || #{id:= Id} <- TimelineItems],
 
-    logger:info("Get timeline end"),
+    % logger:info("Get timeline end"),
     {reply, Event, State#state{timeline_opts   = Cmd,
                                timeline_bounds = {NewMinId, NewMaxId},
                                timeline_items  = TimelineIds}};

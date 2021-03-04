@@ -8,6 +8,7 @@
 ]).
 
 -include_lib("mzbench_language/include/mzbl_types.hrl").
+-include_lib("mzbench_utils/include/localhost.hrl").
 
 -define(MICROSEC_IN_SEC, 1000000).
 
@@ -96,7 +97,7 @@ clean_nodes(NodePids, Config, Logger) ->
         [],
         Logger),
     _ = kill_nodes(NodePids, [DirectorHost|WorkerHosts], Codes, UserName, Logger),
-    length(RootDir) > 1 andalso mzb_subprocess:remote_cmd(UserName, [DirectorHost|WorkerHosts], mzb_string:format("rm -rf ~ts", [RootDir]), [], Logger),
+    byte_size(RootDir) > 1 andalso mzb_subprocess:remote_cmd(UserName, [DirectorHost|WorkerHosts], mzb_string:format("rm -rf ~ts", [RootDir]), [], Logger),
     ok.
 
 kill_nodes([], _, _, _, _) -> ok;
@@ -146,7 +147,7 @@ ntp_check(UserName, Hosts, Logger) ->
     end.
 
 nodename(Name, N) ->
-    erlang:list_to_atom(mzb_string:format("~ts_~b@127.0.0.1", [Name, N])).
+    erlang:binary_to_atom(mzb_string:format("~ts_~b@127.0.0.1", [Name, N])).
 
 ensure_vm_args(Hosts, Nodenames, Config, Logger) ->
     _ = mzb_lists:pmap(
@@ -168,7 +169,7 @@ ensure_file_content(Hosts, Content, Filepath,
     ok = ensure_file(UserName, Hosts, Localfile, Remotefile, Logger),
     ok = file:delete(Localfile).
 
-ensure_file(_UserName, [Host], LocalPath, RemotePath, _Logger) when Host == <<"localhost">>; Host == <<"127.0.0.1">> ->
+ensure_file(_UserName, [Host], LocalPath, RemotePath, _Logger) when ?IS_LOCALHOST(Host) ->
     logger:info( "[ COPY ] ~ts -> ~ts", [LocalPath, RemotePath]),
     {ok, _} = file:copy(LocalPath, RemotePath),
     ok;
@@ -187,7 +188,7 @@ ensure_file(UserName, Hosts, LocalPath, RemotePath, _Logger) ->
     ok.
 
 -spec ensure_dir(undefined | string(), [string()], string(), fun((atom(), string(), [term()]) -> ok)) -> ok.
-ensure_dir(_User, [Local], Dir, _Logger) when Local == <<"localhost">>; Local == <<"127.0.0.1">> ->
+ensure_dir(_User, [Local], Dir, _Logger) when ?IS_LOCALHOST(Local) ->
     logger:info( "[ MKDIR ] ~ts", [Dir]),
     % The trailing slash is needed, otherwise it will only
     % create Dir's parent, but not Dir itself
@@ -216,7 +217,7 @@ vm_args_content(NodeName, #{node_log_port:= LogPort, node_management_port:= Port
          mzb_string:format("-mzbench node_interconnect_port ~b", [InterconnectPort])] ++
         [mzb_string:format("-mzbench metric_update_interval_ms ~b", [UpdateIntervalMs]) || UpdateIntervalMs /= undefined],
 
-    mzb_string:format(string:join([A ++ "~n" || A <- NewArgs ++ ConfigArgs], ""), []).
+    mzb_string:merge([[ A, <<"\n">> ] || A <- NewArgs ++ ConfigArgs]).
 
 get_host_os_id(UserName, Hosts, Logger) ->
     OSIds = mzb_subprocess:remote_cmd(UserName, Hosts, "uname -sr", [], Logger, []),
@@ -235,9 +236,11 @@ get_host_system_id(UserName, Hosts, Logger) ->
 
 download_file(User, Host, FromFile, ToFile, Logger) ->
     _ = case Host of
-        Local when Local == <<"localhost">>; Local == <<"127.0.0.1">> ->
-            logger:info( "[ COPY ] ~ts <- ~ts", [ToFile, FromFile]),
-            {ok, _} = file:copy(FromFile, ToFile);
+        Local when ?IS_LOCALHOST(Local) ->
+            logger:info( "[ COPY ] ~ts -> ~ts", [FromFile, ToFile]),
+            Cmd = mzb_string:format("cp ~ts ~ts", [ FromFile, ToFile ]),
+            mzb_subprocess:exec_format(Cmd, [], [], Logger);
+            %{ok, _} = file:copy(FromFile, ToFile);
         _ ->
             UserNameParam =
                 case User of
@@ -302,7 +305,7 @@ install_package(Hosts, PackageName, InstallSpec, InstallationDir, Config, Logger
     OSsWithMissingTarballs = case [OS || {OS, _} <- MissingTarballs] of
         ["noarch"] -> logger:info( "Building package ~ts on api server", [PackageName]),
                       [TarballPath] = [T || {_, T} <- MissingTarballs],
-                      build_package_on_host(<<"127.0.0.1">>, User, TarballPath, InstallSpec, Logger),
+                      build_package_on_host(<<"127.0.0.1">>, mzb_subprocess:who_am_i(), TarballPath, InstallSpec, Logger),
                       [];
                  L -> L
         end,
@@ -316,7 +319,7 @@ install_package(Hosts, PackageName, InstallSpec, InstallationDir, Config, Logger
                         build_package_on_host(Host, User, RemoteTarballPath, InstallSpec, Logger),
                         case lists:keyfind(OS, 2, HostsAndOSs) of
                             {Host, OS} ->
-                                logger:info( "Downloading package ~ts from ~ts", [PackageName, Host]),
+                                logger:info("Downloading package ~ts from ~ts", [PackageName, Host]),
                                 download_file(User, Host, RemoteTarballPath, LocalTarballPath, Logger);
                             _ ->
                                 ok
@@ -330,8 +333,9 @@ install_package(Hosts, PackageName, InstallSpec, InstallationDir, Config, Logger
                     [ExtractDir, ExtractDir, RemoteTarballPath, InstallationDir, ExtractDir, InstallationDir]),
                 _ = mzb_subprocess:remote_cmd(User, [Host], InstallationCmd, [], Logger)
             after
-                RemoveCmd = mzb_string:format("rm -rf ~ts; rm -rf ~ts; true", [RemoteTarballPath, ExtractDir]),
-                _ = mzb_subprocess:remote_cmd(User, [Host], RemoveCmd, [], Logger)
+                % RemoveCmd = mzb_string:format("rm -rf ~ts; rm -rf ~ts; true", [RemoteTarballPath, ExtractDir]),
+                % _ = mzb_subprocess:remote_cmd(User, [Host], RemoveCmd, [], Logger)
+                ok
             end
         end,
         HostsAndOSs),
@@ -352,19 +356,38 @@ build_package_on_host(Host, User, RemoteTarballPath, InstallSpec, Logger) ->
     case InstallSpec of
         #git_install_spec{repo = GitRepo, branch = GitBranch, dir = GitSubDir} ->
             Cmd = mzb_string:format("git clone ~ts deployment_code && cd deployment_code && git checkout ~ts && cd ./~ts", [GitRepo, GitBranch, GitSubDir]),
-            GenerationCmd = mzb_string:format("mkdir -p ~ts && cd ~ts && ~ts "
-                                          "&& make generate_tgz && mv *.tgz ~ts",
-                                          [DeploymentDirectory, DeploymentDirectory,
-                                           Cmd, RemoteTarballPath]),
+            GenerationCmd = mzb_string:format("mkdir -p ~ts && cd ~ts && ~ts && make generate_tgz && mv -v *.tgz ~ts",
+                                          [DeploymentDirectory, DeploymentDirectory, Cmd, RemoteTarballPath]),
             _ = mzb_subprocess:remote_cmd(User, [Host], GenerationCmd, [], Logger);
         #rsync_install_spec{remote = Remote, excludes = Excludes, dir = SubDir} ->
+            RemoteAbs = filename:absname(Remote),
             TargetFolder = DeploymentDirectory ++ "/deployment_code",
-            Cmd = mzb_string:format("rsync -aW --rsync-path='mkdir -p ~ts && rsync' ~ts ~ts/ ~ts",
-                [TargetFolder, string:join(["--exclude=" ++ E || E <- Excludes], " "), Remote, User ++ "@" ++ Host ++ ":" ++ TargetFolder]),
-            mzb_subprocess:exec_format(Cmd, [], [], Logger),
-            GenerationCmd = mzb_string:format("cd ~ts/~ts && make generate_tgz && mv *.tgz ~ts",
-                                          [TargetFolder, SubDir, RemoteTarballPath]),
-            _ = mzb_subprocess:remote_cmd(User, [Host], GenerationCmd, [], Logger)
+            RSyncExcludes =  mzb_string:join([[<<"--exclude=">>, E] || E <- Excludes], <<" ">>),
+            MainFolder = TargetFolder ++ "/" ++ SubDir,
+            case ?IS_LOCALHOST(Host) of
+                true ->
+                    mzb_subprocess:exec_format([
+                        {"cd ~ts && ./scripts/prepare_sources.sh", [ RemoteAbs ]},
+                        {"mkdir -p ~ts", [ TargetFolder ]},
+                        {"rsync -aWL -v --stats --progress ~ts ~ts/prepared_sources/ ~ts/node/", [ RSyncExcludes, RemoteAbs, TargetFolder ] }
+                    ], Logger),
+                    mzb_subprocess:exec_format([
+                        {"cd ~ts &&  make generate_tgz && mv -v *.tgz ~ts", [MainFolder, RemoteTarballPath] }
+                    ], [
+                        { env, [
+                            { <<"PATH">>, os:get_env_var("PATH")}
+                        ]}
+                    ],Logger);
+                false ->
+                    RemHost = mzb_string:merge([User, <<"@">>, Host, <<":">>, TargetFolder]),
+                    mzb_subprocess:exec_format([
+                        {"cd ~ts && ./scripts/prepare_sources.sh", [ RemoteAbs ]},
+                        {"rsync -aWL --rsync-path='mkdir -p ~ts && rsync' ~ts ~ts/prepared_sources/ ~ts/node/", [ TargetFolder, RSyncExcludes, Remote, RemHost ] }
+                    ], Logger),
+                    mzb_subprocess:exec_format([
+                        {"cd ~ts && make generate_tgz && mv -v *.tgz ~ts", [MainFolder, SubDir, RemoteTarballPath] }
+                    ], Logger)
+            end
     end,
     ok.
 

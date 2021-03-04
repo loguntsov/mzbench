@@ -1,5 +1,6 @@
 -module(mzb_k8s_plugin).
 
+-behaviour(mzb_api_cloud).
 -export([start/2, create_cluster/3, destroy_cluster/1]).
 
 -define(POLL_INTERVAL, 2000).

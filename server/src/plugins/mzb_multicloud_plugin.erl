@@ -1,5 +1,6 @@
 -module(mzb_multicloud_plugin).
 
+-behaviour(mzb_api_cloud).
 -export([
     start/2,
     create_cluster/3,

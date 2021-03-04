@@ -1,5 +1,6 @@
 -module(mzb_api_ec2_plugin).
 
+-behaviour(mzb_api_cloud).
 -export([start/2, create_cluster/3, destroy_cluster/1]).
 
 -include_lib("erlcloud/include/erlcloud.hrl").

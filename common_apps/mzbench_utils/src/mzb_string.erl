@@ -1,7 +1,15 @@
 -module(mzb_string).
 
+-compile({no_autoimport, [ length/1 ]}).
+
 -export([
-    format/2,
+    format/1, format/2,
+    join/2,
+    merge/1,
+    indent/2, indent/3,
+    trim_right/2,
+    length/1,
+    to_binary/1,
     char_substitute/3,
     wildcard_to_regexp/1,
     iso_8601_fmt/1,
@@ -9,6 +17,13 @@
     str_to_bstr/1,
     unescape_ascii/1,
     list_to_number/1
+]).
+
+
+
+-type str() :: binary().
+-export_type([
+  str/0
 ]).
 
 -spec unescape_ascii(Escaped :: string()) -> Unescaped :: string().
@@ -30,10 +45,39 @@ unescape_ascii([]) -> [].
 format(Format, Args) ->
     unicode:characters_to_binary(lists:flatten(io_lib:format(Format, Args))).
 
+format(Formats) ->
+    iolist_to_binary(lists:map(fun({Format, Args}) -> format(Format, Args) end, Formats)).
+
+join([], _Sep) ->
+  [];
+join([H|T], Sep) ->
+  iolist_to_binary([ H, [[Sep, X ] || X <- T]]).
+
+merge(List) ->
+  iolist_to_binary(List).
+
 -spec char_substitute(string(), char(), char()) -> string().
 char_substitute(String, OldChar, NewChar) ->
     lists:map(fun(Char) when Char =:= OldChar -> NewChar;
         (Char) -> Char end, String).
+
+indent(<<>>, N, Default) -> indent(Default, N);
+indent(Str, N, _) -> indent(Str, N).
+
+indent(Str, N) ->
+    Spaces = iolist_to_binary(lists:duplicate(N, <<" ">>)),
+    join([[ Spaces, Line ] || Line <- binary:split(Str, <<"\n">>, [ global ])], <<"\n">>).
+
+trim_right(<<>>, _) -> <<>>;
+trim_right(Bin, Byte) ->
+    case binary:last(Bin) =:= Byte of
+        true ->
+            trim_right(binary:part(Bin, { 0, byte_size(Bin) - 1 }), Byte);
+            _ -> Bin
+    end.
+
+length(Bin) ->
+    byte_size(Bin).
 
 wildcard_to_regexp(Wildcard) ->
     "^" ++ lists:flatten(lists:map(

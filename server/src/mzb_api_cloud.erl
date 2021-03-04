@@ -15,6 +15,12 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-type state() :: term().
+
+-callback start(Name :: binary(), Opts :: #{}) -> state().
+-callback create_cluster(State :: state(), Count :: pos_integer(), Config :: #{}) -> { ok, Id :: term(), UserName :: mzb_string:str(), Hosts :: [mzb_string:str()]}.
+-callback destroy_cluster(Id :: term()) -> ok.
+
 %%%===================================================================
 %%% API
 %%%===================================================================

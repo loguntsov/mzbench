@@ -26,11 +26,13 @@ taken(Ps, N, Len, L) ->
     {K1, V1} = lists:nth(crypto:rand_uniform(1, Len), Ps),
     taken(proplists:delete(K1, Ps), N-1, Len-1, [V1 | L]).
 
+pmap(Fun, [Item]) ->
+  [Fun(Item)];
 pmap(Fun, List) ->
     Self = self(),
     Refs = lists:map(fun (Element) ->
         Ref = erlang:make_ref(),
-        _ = erlang:spawn_link(fun () ->
+        _ = proc_lib:spawn_link(fun () ->
             Res = try
                 {Ref, {ok, Fun(Element)}}
             catch

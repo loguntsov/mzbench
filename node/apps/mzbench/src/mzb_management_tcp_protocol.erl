@@ -1,20 +1,25 @@
 -module(mzb_management_tcp_protocol).
 
 -behaviour(ranch_protocol).
+-export([
+    start_link/3,
+    init/3
+]).
+
 -behaviour(gen_server).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
-%% API
--export([start_link/4]).
+-export([
+    get_port/0
+]).
 
-%% gen_server
--export([init/1,
-         init/4,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3,
-         get_port/0]).
 
 -define(TIMEOUT, 60000).
 
@@ -25,8 +30,72 @@
 
 %% API.
 
-start_link(Ref, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, init, [Ref, Socket, Transport, Opts]).
+start_link(Ref, Transport, Opts) ->
+    proc_lib:start_link(?MODULE, init, [Ref, Transport, Opts]).
+
+init(Ref, Transport, _Opts = []) ->
+    {ok, Socket} = ranch:handshake(Ref),
+    ok = proc_lib:init_ack({ok, self()}),
+    ok = ranch:accept_ack(Ref),
+    ok = Transport:setopts(Socket, [{active, true}, {packet, 4}, binary]),
+
+    gen_event:add_handler(metrics_event_manager, {mzb_metric_reporter, self()}, [self()]),
+    gen_server:enter_loop(?MODULE, [], #state{socket=Socket, transport=Transport}, ?TIMEOUT).
+
+%% GEN_SERVER
+
+get_port() ->
+    ranch:get_port(management_tcp_server).
+
+init([State]) -> {ok, State}.
+
+handle_info({tcp_closed, _Socket}, State) ->
+    mzb_director:notify(server_connection_closed),
+    {stop, normal, State};
+
+handle_info(timeout, State) ->
+    {stop, normal, State};
+
+handle_info({tcp, Socket, Msg}, State = #state{socket = Socket}) ->
+    dispatch(erlang:binary_to_term(Msg), State);
+
+handle_info({tcp_error, _, Reason}, State) ->
+    logger:warning("~tp was closed with error: ~tp", [?MODULE, Reason]),
+    {stop, Reason, State};
+
+handle_info(Info, State) ->
+    logger:error("~tp has received unexpected info: ~tp", [?MODULE, Info]),
+    {stop, normal, State}.
+
+handle_cast(Msg, State) ->
+    logger:error("~tp has received unexpected cast: ~tp", [?MODULE, Msg]),
+    {noreply, State}.
+
+handle_call({new_metrics, Metrics}, _From, State = #state{}) ->
+    send_message({new_metrics, #{ groups => mzb_script_metrics:build_metric_groups_json(Metrics) }}, State),
+    {reply, ok, State};
+
+handle_call({report, [Name, Value]}, _From, State = #state{}) ->
+    send_message({metric_value, Name, unix_time(), Value}, State),
+    {reply, ok, State};
+
+handle_call(Request, _From, State) ->
+    logger:error("~tp has received unexpected call: ~tp", [?MODULE, Request]),
+    {reply, ignore, State}.
+
+terminate(_Reason, _State) ->
+    logger:info("Management tcp connection terminated: ~tp", [_Reason]),
+    gen_event:delete_handler(metrics_event_manager, {mzb_metric_reporter, self()}, []),
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+unix_time() ->
+    {Mega, Secs, _} = os:timestamp(),
+    Mega * 1000000 + Secs.
+
+%% INTERNAL
 
 dispatch({request, Ref, Msg}, State) ->
     ReplyFun = fun (Reply) -> send_message({response, Ref, {result, Reply}}, State) end,
@@ -48,8 +117,7 @@ dispatch(Unhandled, State) ->
     logger:error("Unhandled tcp message: ~tp", [Unhandled]),
     {noreply, State}.
 
-get_port() ->
-    ranch:get_port(management_tcp_server).
+%%  MESSAGE HANDLER
 
 handle_message({start_benchmark, ScriptPath, Env}, _) ->
     {reply, mzb_bench_sup:run_bench(ScriptPath, Env)};
@@ -120,61 +188,7 @@ handle_message(get_cumulative_histograms, _) ->
 handle_message(Msg, _) ->
     erlang:error({unhandled, Msg}).
 
-init([State]) -> {ok, State}.
-
-init(Ref, Socket, Transport, _Opts = []) ->
-    ok = proc_lib:init_ack({ok, self()}),
-    ok = ranch:accept_ack(Ref),
-    ok = Transport:setopts(Socket, [{active, true}, {packet, 4}, binary]),
-
-    gen_event:add_handler(metrics_event_manager, {mzb_metric_reporter, self()}, [self()]),
-    gen_server:enter_loop(?MODULE, [], #state{socket=Socket, transport=Transport}, ?TIMEOUT).
-
-handle_info({tcp_closed, _Socket}, State) ->
-    mzb_director:notify(server_connection_closed),
-    {stop, normal, State};
-
-handle_info(timeout, State) ->
-    {stop, normal, State};
-
-handle_info({tcp, Socket, Msg}, State = #state{socket = Socket}) ->
-    dispatch(erlang:binary_to_term(Msg), State);
-
-handle_info({tcp_error, _, Reason}, State) ->
-    logger:warning("~tp was closed with error: ~tp", [?MODULE, Reason]),
-    {stop, Reason, State};
-
-handle_info(Info, State) ->
-    logger:error("~tp has received unexpected info: ~tp", [?MODULE, Info]),
-    {stop, normal, State}.
-
-handle_cast(Msg, State) ->
-    logger:error("~tp has received unexpected cast: ~tp", [?MODULE, Msg]),
-    {noreply, State}.
-
-handle_call({new_metrics, Metrics}, _From, State = #state{}) ->
-    send_message({new_metrics, #{ groups => mzb_script_metrics:build_metric_groups_json(Metrics) }}, State),
-    {reply, ok, State};
-
-handle_call({report, [Name, Value]}, _From, State = #state{}) ->
-    send_message({metric_value, Name, unix_time(), Value}, State),
-    {reply, ok, State};
-
-handle_call(Request, _From, State) ->
-    logger:error("~tp has received unexpected call: ~tp", [?MODULE, Request]),
-    {reply, ignore, State}.
-
-terminate(_Reason, _State) ->
-    logger:info("Management tcp connection terminated: ~tp", [_Reason]),
-    gen_event:delete_handler(metrics_event_manager, {mzb_metric_reporter, self()}, []),
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-unix_time() ->
-    {Mega, Secs, _} = os:timestamp(),
-    Mega * 1000000 + Secs.
+%% ---------------
 
 send_message(Msg, #state{socket = Socket, transport = Transport}) ->
     Transport:send(Socket, erlang:term_to_binary(Msg)).
