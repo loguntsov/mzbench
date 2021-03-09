@@ -20,7 +20,7 @@ doubled_print_counter() ->
 print(State, _Meta, Text) ->
     Start = os:timestamp(),
     _ = mzb_metrics:notify("print", 1),
-    lager:info("Dummy print: ~tp", [Text]),
+    logger:info("Dummy print: ~tp", [Text]),
     Finish = os:timestamp(),
     _ = mzb_metrics:notify({"dummy", histogram}, timer:now_diff(Finish, Start)),
     {nil, State}.

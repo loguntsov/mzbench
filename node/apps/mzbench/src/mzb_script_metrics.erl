@@ -202,7 +202,7 @@ build_metric_groups_json(Groups) ->
     end, MetricGroups).
 
 is_str(S) ->
-    io_lib:printable_list(S).
+    is_binary(S) orelse io_lib:printable_list(S).
 
 format_error({metrics_not_list, Seq}) -> mzb_string:format("Metrics should be a list: ~tp", [Seq]);
 format_error({invalid_group_format, G}) -> mzb_string:format("Invalid group format: ~tp", [G]);

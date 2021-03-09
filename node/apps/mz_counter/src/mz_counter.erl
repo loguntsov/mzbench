@@ -1,22 +1,24 @@
 -module(mz_counter).
 
--export([start_link/0,
-         create/1,
-         notify/2,
-         get_value/1,
-         create_raw/0,
-         notify_raw/2,
-         get_value_raw/1,
-         reset/1]).
+-export([
+    start_link/0,
+    create/1,
+    notify/2,
+    get_value/1,
+    create_raw/0,
+    notify_raw/2,
+    get_value_raw/1,
+    reset/1
+]).
 
 -behaviour(gen_server).
-
 -export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -on_load(init/0).
 
@@ -38,20 +40,21 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 create(Name) ->
-    gen_server:call(?MODULE, {create, Name}).
+    gen_server:call(?MODULE, {create, iolist_to_binary(Name)}).
 
 notify(Name, Value) ->
-    case erlang:get({mz_counter_ref, Name}) of
+    NameBin = iolist_to_binary(Name),
+    case erlang:get({mz_counter_ref, NameBin}) of
         undefined ->
             Ref =
-                try ets:lookup_element(?MODULE, Name, 2) of
+                try ets:lookup_element(?MODULE, NameBin, 2) of
                     R -> R
                 catch
                     _:_ ->
-                        ok = create(Name),
-                        ets:lookup_element(?MODULE, Name, 2)
+                        ok = create(NameBin),
+                        ets:lookup_element(?MODULE, NameBin, 2)
                 end,
-            erlang:put({mz_counter_ref, Name}, Ref),
+            erlang:put({mz_counter_ref, NameBin}, Ref),
             update_counter(Ref, Value);
         Ref ->
             update_counter(Ref, Value)
@@ -104,15 +107,15 @@ handle_call({create, Name}, _From, State) ->
     {reply, ok, State};
 
 handle_call(Req, _From, State) ->
-    lager:error("Unhandled call: ~tp", [Req]),
+    logger:error("Unhandled call: ~tp", [Req]),
     {stop, {unhandled_call, Req}, State}.
 
 handle_cast(Msg, State) ->
-    lager:error("Unhandled cast: ~tp", [Msg]),
+    logger:error("Unhandled cast: ~tp", [Msg]),
     {stop, {unhandled_cast, Msg}, State}.
 
 handle_info(Info, State) ->
-    lager:error("Unhandled info: ~tp", [Info]),
+    logger:error("Unhandled info: ~tp", [Info]),
     {noreply, State}.
 
 terminate(_Reason, _State) ->

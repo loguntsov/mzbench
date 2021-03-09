@@ -23,7 +23,6 @@ start_link(Ref, Transport, Opts) ->
 init(Ref, Transport, Opts) ->
     {ok, Socket} = ranch:handshake(Ref),
     ok = proc_lib:init_ack({ok, self()}),
-    ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, once}, {packet, 4}, {keepalive, true}, binary]),
 
     ok = case lists:member(user, Opts) of

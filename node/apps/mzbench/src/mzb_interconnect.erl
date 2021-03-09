@@ -97,7 +97,7 @@ multi_call(Nodes, Req, Timeout) ->
                 R -> {ok, {N, R}}
             catch
                 _:Reason:ST ->
-                    lager:error("Call ~tp to ~tp failed with reason: ~tp~n~tp", [Req, N, Reason, ST]),
+                    logger:error("Call ~tp to ~tp failed with reason: ~tp~n~tp", [Req, N, Reason, ST]),
                     {bad, N}
             end
         end, Nodes),

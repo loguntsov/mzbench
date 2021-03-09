@@ -26,7 +26,7 @@
 -record(state, {
     socket :: any(),
     transport :: module()
-    }).
+}).
 
 %% API.
 
@@ -36,7 +36,6 @@ start_link(Ref, Transport, Opts) ->
 init(Ref, Transport, _Opts = []) ->
     {ok, Socket} = ranch:handshake(Ref),
     ok = proc_lib:init_ack({ok, self()}),
-    ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, true}, {packet, 4}, binary]),
 
     gen_event:add_handler(metrics_event_manager, {mzb_metric_reporter, self()}, [self()]),

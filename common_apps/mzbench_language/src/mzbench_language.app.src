@@ -2,5 +2,13 @@
   {description, ""},
   {vsn, "1.0.0"},
   {registered, []},
-  {applications, [kernel, stdlib, inets, sasl, pretty_errors, mzbench_utils, jiffy]}
+  {applications, [
+    kernel,
+    stdlib,
+    inets,
+    sasl,
+    pretty_errors,
+    mzbench_utils,
+    jiffy
+  ]}
 ]}.

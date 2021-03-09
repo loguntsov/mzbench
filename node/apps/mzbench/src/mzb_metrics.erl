@@ -360,7 +360,7 @@ eval_rps(#s{previous_counter_values = PreviousData, last_rps_calculation_time = 
             Counters = [N || {N, counter, _} <- global_metrics()],
             NewData = lists:foldl(
                 fun (Metric, Acc) ->
-                    NewMetric = Metric ++ ".rps",
+                    NewMetric = iolist_to_binary([Metric,<<".rps">>]),
                     Old = proplists:get_value(NewMetric, Acc, 0),
                     New = global_get(Metric),
                     HitsPerSecond = ((New - Old) * 1000000) / TimeInterval,

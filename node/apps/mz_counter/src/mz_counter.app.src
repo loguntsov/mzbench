@@ -5,8 +5,7 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib,
-                  lager
+                  stdlib
                  ]},
   {mod, { mz_counter_app, []}},
   {env, [

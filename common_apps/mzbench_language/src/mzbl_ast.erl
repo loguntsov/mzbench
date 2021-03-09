@@ -168,7 +168,9 @@ var_eval(var, Env, [Name, Default]) ->
     end;
 var_eval(var, Env, [Name]) ->
     case proplists:is_defined(Name, Env) of
-        false -> erlang:error({var_is_unbound, Name});
+        false ->
+          logger:info("Env ~p", [ Env ]),
+          erlang:error({var_is_unbound, Name});
         true -> proplists:get_value(Name, Env)
     end;
 var_eval(numvar, Env, Args) ->

@@ -56,10 +56,10 @@ read_from_string(String) ->
         mzbl_literals:convert(parse(String))
     catch
         C:{parse_error, {_, _, ErrorInfo}} = E:ST ->
-            lager:error("Parsing script file failed: ~ts", [erl_parse:format_error(ErrorInfo)]),
+            logger:error("Parsing script file failed: ~ts", [erl_parse:format_error(ErrorInfo)]),
             erlang:raise(C,E,ST);
         C:E:ST ->
-            lager:error(
+            logger:error(
                 "Failed to read script '~tp' 'cause of ~tp~nStacktrace: ~ts",
                 [String, E, pretty_errors:stacktrace(ST)]),
             erlang:raise(C,E,ST)
@@ -71,7 +71,7 @@ read(Path) ->
         read_from_string(read_file(Path))
     catch
         C:E:ST ->
-            lager:error(
+            logger:error(
                 "Failed to read script: ~tp 'cause of ~tp~nStacktrace: ~ts",
                 [Path, E, pretty_errors:stacktrace(ST)]),
             erlang:raise(C,E,ST)
@@ -81,18 +81,20 @@ read(Path) ->
 parse(Body) ->
     case bdl_script(Body) of
         true -> new_parser(Body);
-        _ ->case erl_scan:string(Body) of
+        _ ->
+            case erl_scan:string(Body) of
                 {ok, [], _} -> [];
                 {ok, Ts, _} ->
+                    io:format("TS ~p", [ Ts ]),
                     case erl_parse:parse_exprs(Ts) of
                         {ok, [AST]} ->
                             mzbl_ast:transform(AST);
                         {error, Error} ->
-                            erlang:error({parse_error, Error})
+                            erlang:error({parse_error, lists:flatten(Error)})
                     end;
                 {error, Error, _} ->
                     erlang:error({parse_error, Error})
-            end
+             end
     end.
 
 -spec new_parser(string()) -> term().
@@ -207,7 +209,7 @@ import_resource(Env, File, Type) ->
                         case lists:append([mzb_file:wildcard(M) || M <- Masks])  of
                             [] -> erlang:error(enoent);
                             [Path|_] ->
-                                lager:error("Trying ~tp...", [Path]),
+                                logger:error("Trying ~tp...", [Path]),
                                 case file:read_file(Path) of
                                     {ok, D} -> D;
                                     {error, R} -> erlang:error(R)
@@ -218,7 +220,7 @@ import_resource(Env, File, Type) ->
         convert(Content, Type)
     catch
         _:Reason ->
-            lager:error("Resource ~tp(~tp) import error: ~tp", [File, Type, Reason]),
+            logger:error("Resource ~tp(~tp) import error: ~tp", [File, Type, Reason]),
             erlang:error({import_resource_error, File, Type, Reason})
     end.
 

@@ -44,7 +44,7 @@ create_cluster(PluginOpts, NumNodes, ClusterConfig) when is_integer(NumNodes), N
                 undefined -> get_config_value(image, PodSpec);
                 V -> V
             end,
-    BenchName = "mzbench-" ++ integer_to_list(BenchId),
+    BenchName = iolist_to_binary("mzbench-" ++ integer_to_list(BenchId)),
     ID = {Context, Namespace, BenchName},
 
 

@@ -338,5 +338,5 @@ get_stats_data() ->
 
 compile_and_load(Script, Env) ->
     {NewScript, ModulesToLoad} = mzb_compiler:compile(Script, Env),
-    [{module, _} = code:load_binary(Mod, mzb_string:format("~ts.erl", [Mod]), Bin) || {Mod, Bin} <- ModulesToLoad],
+    [{module, _} = code:load_binary(Mod, binary_to_list(mzb_string:format("~ts.erl", [Mod])), Bin) || {Mod, Bin} <- ModulesToLoad],
     {ok, NewScript}.

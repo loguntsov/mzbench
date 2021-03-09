@@ -1,9 +1,14 @@
 -module(mzb_lager_tcp).
 
 -behaviour(gen_event).
-
--export([init/1, handle_call/2, handle_event/2, handle_info/2, terminate/2,
-        code_change/3]).
+-export([
+  init/1,
+  handle_call/2,
+  handle_event/2,
+  handle_info/2,
+  terminate/2,
+  code_change/3
+]).
 
 -record(state, {level :: {'mask', integer()},
                 formatter :: atom(),

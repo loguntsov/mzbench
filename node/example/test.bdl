@@ -1,3 +1,4 @@
+#!benchDL
 pool(size = 3, # three execution "threads"
      worker_type = dummy_worker):
         loop(time = 5 min, # total loop time

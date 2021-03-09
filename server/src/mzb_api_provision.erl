@@ -97,7 +97,7 @@ clean_nodes(NodePids, Config, Logger) ->
         [],
         Logger),
     _ = kill_nodes(NodePids, [DirectorHost|WorkerHosts], Codes, UserName, Logger),
-    byte_size(RootDir) > 1 andalso mzb_subprocess:remote_cmd(UserName, [DirectorHost|WorkerHosts], mzb_string:format("rm -rf ~ts", [RootDir]), [], Logger),
+    %% byte_size(RootDir) > 1 andalso mzb_subprocess:remote_cmd(UserName, [DirectorHost|WorkerHosts], mzb_string:format("rm -rf ~ts", [RootDir]), [], Logger),
     ok.
 
 kill_nodes([], _, _, _, _) -> ok;
@@ -164,7 +164,7 @@ ensure_file_content(Hosts, Content, Filepath,
             "~/" ++ _ -> Filepath;
             _ -> mzb_api_bench:remote_path(Filepath, Config)
         end,
-    logger:debug( "Ensure file content on hosts: ~tp~nLocal filename: ~tp~nContent: ~ts~nRemote path: ~tp", [Hosts, Localfile, Content, Remotefile]),
+    logger:info( "Ensure file content on hosts: ~tp~nLocal filename: ~tp~nContent: ~ts~nRemote path: ~tp", [Hosts, Localfile, Content, Remotefile]),
     ok = file:write_file(Localfile, Content),
     ok = ensure_file(UserName, Hosts, Localfile, Remotefile, Logger),
     ok = file:delete(Localfile).

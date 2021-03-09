@@ -169,12 +169,12 @@ superloop(TimeFun, Rates, Body, WorkerProvider, State, Env, Opts) ->
     end.
 
 looprun(TimeFun, Rate, Body, WorkerProvider, State, Env, Opts = #opts{parallel = 1})  ->
-    timerun(msnow(), random:uniform(), TimeFun, Rate, Body, WorkerProvider, Env, true, Opts, 1, State, 0, 0, {0, 0});
+    timerun(msnow(), rand:uniform(), TimeFun, Rate, Body, WorkerProvider, Env, true, Opts, 1, State, 0, 0, {0, 0});
 looprun(TimeFun, Rate, Body, WorkerProvider, State, Env, Opts = #opts{parallel = N}) ->
     StartTime = msnow(),
-    _ = mzb_lists:pmap(fun (I) ->
-        _ = random:seed(now()),
-        timerun(StartTime, I + random:uniform(), TimeFun, Rate, Body, WorkerProvider, Env, true, Opts, 1, State, 0, 0, {0, I})
+    mzb_lists:pmap(fun (I) ->
+        rand:seed(os:timestamp()),
+        timerun(StartTime, I + rand:uniform(), TimeFun, Rate, Body, WorkerProvider, Env, true, Opts, 1, State, 0, 0, {0, I})
     end, lists:seq(0, N - 1)),
     {nil, State}.
 
@@ -199,7 +199,7 @@ timerun(Start, Shift, TimeFun, Rate, Body, WorkerProvider, Env, IsFirst, Opts, B
     NeedToSleep = max(0, min(Remain, GotTime)),
     Sleep =
         case Opts#opts.poisson of
-            true -> max(0, min(round(-Remain * math:log(random:uniform())), GotTime));
+            true -> max(0, min(round(-Remain * math:log(rand:uniform())), GotTime));
             false -> NeedToSleep
         end,
     case Sleep > ?MAXSLEEP of

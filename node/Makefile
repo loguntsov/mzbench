@@ -87,3 +87,12 @@ $(RELEASE_BINARY): .make/compilation-up-to-date rel/files/sys.config rel/files/v
 	rm -rf .make/git-rev-*
 	mkdir -p .make && touch $@
 
+
+.PHONY: shell
+shell:
+	rm -rf log
+	$(REBAR) shell
+
+.PHONY: local
+local:
+	./scripts/run_local.escript example/test.bdl

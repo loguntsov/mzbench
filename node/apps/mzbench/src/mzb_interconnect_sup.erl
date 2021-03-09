@@ -28,7 +28,7 @@ get_port() ->
 init([main, Port, Handler]) ->
     {ok, {{one_for_all, 100, 100}, [
             {main_server, {mzb_interconnect, start_link, [Handler]}, permanent, 5000, worker, [mzb_interconnect]},
-            ranch:child_spec(interconnect_server, 10, ranch_tcp, [{port, Port}], mzb_interconnect_server, []),
+            ranch:child_spec(interconnect_server, ranch_tcp, [{port, Port}], mzb_interconnect_server, []),
             {interconnect_clients, {supervisor, start_link, [{local, mzb_interconnect_clients}, ?MODULE, [clients]]}, permanent, infinity, supervisor, []}
         ]}};
 

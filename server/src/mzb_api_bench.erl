@@ -542,13 +542,14 @@ handle_info(_Info, State) ->
 terminate(normal, State) ->
     catch (maps:get(log_file_handler, State))(close),
     catch (maps:get(log_user_file_handler, State))(close);
+
 % something is going wrong there. use special status for bench and run finalize stages again
 terminate(Reason, #{id:= Id} = State) ->
     error("Receive terminate while finalize is not completed: ~tp", [Reason], State),
     mzb_api_server:bench_finished(Id, status(State)),
     catch (maps:get(log_file_handler, State))(close),
     catch (maps:get(log_user_file_handler, State))(close),
-    spawn(
+    proc_lib:spawn(
         fun() ->
             try
                 logger:info("Starting finalizing process for #~tp", [Id]),
@@ -561,8 +562,9 @@ terminate(Reason, #{id:= Id} = State) ->
                                     Res = handle_stage(finalize, Stage, NewState),
                                     Res
                                 catch
-                                    _C:E:ST ->
-                                        error("Stage 'finalize - ~ts': failed~n~ts", [Stage, format_error(Stage, {E, ST})], NewState)
+                                    Err:Reason:ST ->
+                                        error("Stage 'finalize - ~ts': failed~n~ts", [Stage, format_error(Stage, {Reason, ST})], NewState),
+                                        erlang:raise(Err, Reason, ST)
                                 end
                             end, Stages),
 
